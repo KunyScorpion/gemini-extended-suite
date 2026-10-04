@@ -210,8 +210,9 @@ class SidebarFoldersModule {
       const threadId = this.extractThreadId(link.href || link.getAttribute('href') || '');
       if (!threadId) return;
 
-      // 行要素（linkまたは直近のラッパー）
       const rowItem = link.closest('[class*="conversation"], [class*="item"], side-nav-entry') || link;
+      if (rowItem.dataset.gExtQuickProcessed) return;
+      rowItem.dataset.gExtQuickProcessed = 'true';
 
       if (!rowItem.querySelector('.g-ext-quick-folder-btn')) {
         const quickBtn = document.createElement('button');

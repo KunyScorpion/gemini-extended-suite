@@ -200,25 +200,26 @@ class ChatEnhancerModule {
     if (this.generationCheckInterval) clearInterval(this.generationCheckInterval);
 
     this.generationCheckInterval = setInterval(() => {
-      if (!this.enableNotification) return;
+      if (!this.enableNotification || !document.hidden) {
+        this.isGenerating = false;
+        return;
+      }
 
-      const stopBtn = document.querySelector('button[aria-label*="停止"], button[aria-label*="Stop"], .stop-button, mat-progress-bar');
+      const stopBtn = document.querySelector('button[aria-label*="停止"], button[aria-label*="Stop"]');
       const nowGenerating = !!stopBtn;
 
       if (this.isGenerating && !nowGenerating) {
-        if (document.hidden) {
-          chrome.runtime.sendMessage({
-            type: 'SHOW_NOTIFICATION',
-            payload: {
-              title: 'Gemini 回答完了',
-              body: 'バックグラウンドで待機中の回答生成が完了しました。'
-            }
-          });
-        }
+        chrome.runtime.sendMessage({
+          type: 'SHOW_NOTIFICATION',
+          payload: {
+            title: 'Gemini 回答完了',
+            body: 'バックグラウンドで待機中の回答生成が完了しました。'
+          }
+        });
       }
 
       this.isGenerating = nowGenerating;
-    }, 800);
+    }, 1500);
   }
 
   removeUI() {

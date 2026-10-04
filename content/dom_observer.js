@@ -1,6 +1,6 @@
 /**
  * Gemini Extended Suite - DOM Observer & SPA Navigation Watcher
- * SPAの非同期DOM再構築やURL遷移を検知し、UIモジュールを確実に再注入する基盤
+ * SPAの非同期DOM再構築やURL遷移を検知し、安全にUIモジュールを注入（自己誘発ループ完全防止）
  */
 
 class GeminiDomObserver {
@@ -16,24 +16,17 @@ class GeminiDomObserver {
     if (this.isInitialized) return;
     this.isInitialized = true;
 
-    console.log('[Gemini Extended Suite] DOM Observer initializing...');
+    console.log('[Gemini Extended Suite] DOM Observer initializing safely...');
 
-    // 1. SPAのページ遷移（pushState, replaceState, popstate）をフック
     this._hookHistoryEvents();
-
-    // 2. 親DOMに対するMutationObserverの設定
     this._setupMutationObserver();
 
-    // 3. 初回マウント実行
-    this.notifyModules();
+    // 初回マウント
+    setTimeout(() => this.notifyModules(), 200);
   }
 
-  /**
-   * モジュールを登録（checkAndMount関数を持つオブジェクト）
-   */
   registerModule(name, moduleInstance) {
     this.modules.set(name, moduleInstance);
-    // 初期化済みであれば即時チェック
     if (this.isInitialized && typeof moduleInstance.checkAndMount === 'function') {
       try {
         moduleInstance.checkAndMount();
@@ -43,9 +36,6 @@ class GeminiDomObserver {
     }
   }
 
-  /**
-   * 全登録モジュールに再チェック・再マウントを通知
-   */
   notifyModules() {
     for (const [name, mod] of this.modules.entries()) {
       if (typeof mod.checkAndMount === 'function') {
@@ -63,9 +53,8 @@ class GeminiDomObserver {
       if (window.location.href !== this.currentUrl) {
         this.currentUrl = window.location.href;
         console.log('[Gemini Extended Suite] SPA Navigation detected:', this.currentUrl);
-        // URL変更イベントをカスタムディスパッチ
         window.dispatchEvent(new CustomEvent('g-ext-url-changed', { detail: { url: this.currentUrl } }));
-        setTimeout(() => this.notifyModules(), 300);
+        setTimeout(() => this.notifyModules(), 400);
       }
     };
 
@@ -84,50 +73,34 @@ class GeminiDomObserver {
     };
 
     window.addEventListener('popstate', handleUrlChange);
-
-    // バックアップ用インターバルチェック（ハッシュ遷移等）
-    setInterval(handleUrlChange, 1000);
   }
 
   _setupMutationObserver() {
     const targetNode = document.body || document.documentElement;
 
     this.observer = new MutationObserver((mutations) => {
-      // DOM更新が頻発するため、150msでデバウンス
+      // 拡張機能自身のUI変更のみの場合は無視（無限ループを完全防止）
+      let hasExternalChange = false;
+      for (const m of mutations) {
+        if (m.target && m.target.className && typeof m.target.className === 'string' && m.target.className.includes('g-ext-')) {
+          continue;
+        }
+        hasExternalChange = true;
+        break;
+      }
+
+      if (!hasExternalChange) return;
+
+      // 安全な300msデバウンス
       clearTimeout(this.debounceTimer);
       this.debounceTimer = setTimeout(() => {
         this.notifyModules();
-      }, 150);
+      }, 300);
     });
 
     this.observer.observe(targetNode, {
       childList: true,
       subtree: true
-    });
-  }
-
-  /**
-   * ターゲット要素が現れるまで待機するヘルパーユーティリティ
-   */
-  static waitForElement(selector, timeoutMs = 8000) {
-    return new Promise((resolve) => {
-      const existing = document.querySelector(selector);
-      if (existing) return resolve(existing);
-
-      const observer = new MutationObserver(() => {
-        const el = document.querySelector(selector);
-        if (el) {
-          observer.disconnect();
-          resolve(el);
-        }
-      });
-
-      observer.observe(document.body, { childList: true, subtree: true });
-
-      setTimeout(() => {
-        observer.disconnect();
-        resolve(document.querySelector(selector));
-      }, timeoutMs);
     });
   }
 }
