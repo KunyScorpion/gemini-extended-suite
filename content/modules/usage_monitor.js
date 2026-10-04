@@ -1,6 +1,6 @@
 /**
  * Gemini Extended Suite - Feature 5: 公式使用状況・上限常時インジケーター
- * DOMExceptionを完全根絶し、安全な非アクティブ裏タブ経由で公式/usageから自動同期
+ * 1週間の上限パーセンテージ取得修正 ＆ アドオン起動時のみ自動クローズ判定実装
  */
 
 class UsageMonitorModule {
@@ -22,7 +22,6 @@ class UsageMonitorModule {
       this.officialData = data.geminiOfficialQuota;
     }
 
-    // ストレージ変更を監視（裏タブで同期されたら即座にチャット画面のUIを更新）
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'local' && changes.geminiOfficialQuota) {
         this.officialData = changes.geminiOfficialQuota.newValue;
@@ -119,7 +118,7 @@ class UsageMonitorModule {
       this.triggerBackgroundTabSync(true);
     });
 
-    // 公式ページを開く
+    // 公式ページを開く（ユーザー手動オープン）
     wrap.querySelector('#g-ext-btn-open-usage-page').addEventListener('click', (e) => {
       e.stopPropagation();
       window.open('https://gemini.google.com/usage', '_blank');
@@ -172,7 +171,7 @@ class UsageMonitorModule {
         </div>
 
         <div style="font-size:12px;color:var(--g-ext-text);margin-top:6px;border-top:1px dashed var(--g-ext-border);padding-top:4px;">
-          1週間の上限: <strong>${this.officialData.weeklyUsage}</strong>
+          1週間の上限: <strong style="color:var(--g-ext-text);">${this.officialData.weeklyUsage}</strong>
         </div>
         <div style="font-size:11px;color:var(--g-ext-text-muted);">
           ${this.officialData.weeklyReset || ''}
@@ -196,12 +195,7 @@ class UsageMonitorModule {
     }
   }
 
-  /**
-   * Service Worker に要請して非アクティブ裏タブ経由で自動同期（DOMException完全回避）
-   * @param {boolean} force クールダウンを無視して強制取得するか
-   */
   triggerBackgroundTabSync(force = false) {
-    // 自身が /usage ページそのものにいる場合は裏タブ不要
     if (window.location.pathname.startsWith('/usage') || window.location.href.includes('/usage')) return;
 
     const now = Date.now();
@@ -217,8 +211,7 @@ class UsageMonitorModule {
 
     console.log('[Gemini Extended Suite] Requesting background tab sync from Service Worker...');
     
-    chrome.runtime.sendMessage({ type: 'SYNC_USAGE_BACKGROUND_TAB' }, (res) => {
-      // タイムアウト解除用
+    chrome.runtime.sendMessage({ type: 'SYNC_USAGE_BACKGROUND_TAB' }, () => {
       setTimeout(() => {
         this.isFetching = false;
         this.updateUI();
@@ -227,11 +220,13 @@ class UsageMonitorModule {
   }
 
   /**
-   * 自身が /usage ページの場合にDOMから抽出し、Service Workerへタブ終了を通知
+   * /usage ページでの抽出処理
+   * アドオン起動時（#g-ext-auto-sync）のみ自動クローズを要請し、手動オープンの場合は閉じない
    */
   checkIfDirectlyOnUsagePage() {
     if (window.location.pathname.startsWith('/usage') || window.location.href.includes('/usage')) {
-      console.log('[Gemini Extended Suite] On official /usage page. Starting extraction...');
+      const isAutoSync = window.location.hash.includes('g-ext-auto-sync');
+      console.log(`[Gemini Extended Suite] On /usage page. Mode: ${isAutoSync ? 'Auto-sync (background)' : 'Manual (user)'}`);
 
       let hasSynced = false;
 
@@ -241,32 +236,58 @@ class UsageMonitorModule {
         const text = document.body.innerText || '';
         if (!text.includes('現在の使用量') && !text.includes('使用量上限')) return;
 
-        const currentMatch = text.match(/現在の使用量[^\d]*(\d+)%\s*使用中/);
+        // 1. 現在の使用量
+        const currentMatch = text.match(/現在の使用量[\s\S]*?(\d+)%\s*使用中/);
         const resetMatch = text.match(/(\d{1,2}:\d{2}\s*にリセット)/);
-        const weeklyMatch = text.match(/1\s*週間の上限[^\d]*(\d+)%\s*使用中/);
+
+        // 2. 1週間の上限（日付の数字で途切れないよう改行を含めてマッチ）
+        const weeklyMatch = text.match(/1\s*週間の上限[\s\S]*?(\d+)%\s*使用中/);
         const weeklyResetMatch = text.match(/(\d+月\d+日の\d{1,2}:\d{2}\s*にリセットされます|\d+月\d+日[^\n]*リセット)/);
 
+        // フォールバック: 全体から「(\d+)% 使用中」を順番に抽出
+        const allUsageMatches = Array.from(text.matchAll(/(\d+)%\s*使用中/g));
+
+        let currentPercent = null;
+        let weeklyPercent = null;
+
         if (currentMatch) {
+          currentPercent = parseInt(currentMatch[1], 10);
+        } else if (allUsageMatches.length > 0) {
+          currentPercent = parseInt(allUsageMatches[0][1], 10);
+        }
+
+        if (weeklyMatch) {
+          weeklyPercent = parseInt(weeklyMatch[1], 10);
+        } else if (allUsageMatches.length > 1) {
+          weeklyPercent = parseInt(allUsageMatches[1][1], 10);
+        }
+
+        if (currentPercent !== null) {
           hasSynced = true;
           const now = new Date();
           const timeStr = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
 
           const data = {
-            currentUsage: `${currentMatch[1]}% 使用中`,
-            currentPercent: parseInt(currentMatch[1], 10),
+            currentUsage: `${currentPercent}% 使用中`,
+            currentPercent: currentPercent,
             resetTime: resetMatch ? resetMatch[1] : '',
-            weeklyUsage: weeklyMatch ? `${weeklyMatch[1]}% 使用中` : '',
-            weeklyPercent: weeklyMatch ? parseInt(weeklyMatch[1], 10) : 0,
+            weeklyUsage: weeklyPercent !== null ? `${weeklyPercent}% 使用中` : '取得完了',
+            weeklyPercent: weeklyPercent !== null ? weeklyPercent : 0,
             weeklyReset: weeklyResetMatch ? weeklyResetMatch[1] : '',
-            lastSynced: `${timeStr} (自動)`
+            lastSynced: `${timeStr} (${isAutoSync ? '自動' : '手動'})`
           };
 
           this.officialData = data;
           chrome.storage.local.set({ geminiOfficialQuota: data }, () => {
-            console.log('[Gemini Extended Suite] ✅ Saved official /usage data to storage:', data);
-            
-            // Service Workerに裏タブの終了を通知
-            chrome.runtime.sendMessage({ type: 'USAGE_SYNC_COMPLETE' });
+            console.log('[Gemini Extended Suite] ✅ Saved official /usage data:', data);
+
+            if (isAutoSync) {
+              // アドオンが裏で開いた場合のみ、自動クローズをService Workerに要請！
+              chrome.runtime.sendMessage({ type: 'USAGE_SYNC_COMPLETE' });
+            } else {
+              // ユーザーが自分で開いた場合はタブを閉じず、トーストを表示
+              this.showSyncToast();
+            }
           });
         }
       };
@@ -275,6 +296,30 @@ class UsageMonitorModule {
       setTimeout(tryScrape, 1800);
       setTimeout(tryScrape, 3200);
     }
+  }
+
+  showSyncToast() {
+    if (document.getElementById('g-ext-sync-toast')) return;
+    const toast = document.createElement('div');
+    toast.id = 'g-ext-sync-toast';
+    toast.style.cssText = `
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #1e2230;
+      color: #10b981;
+      border: 1px solid #10b981;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      z-index: 999999;
+      animation: g-ext-fadeIn 0.2s ease-out;
+    `;
+    toast.innerHTML = '✅ Gemini Extended Suite に最新の使用状況を同期しました';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
   }
 
   removeUI() {
