@@ -1,0 +1,58 @@
+# Dependency directories
+node_modules/
+jspm_packages/
+web_modules/
+
+# Environment and secrets
+.env
+.env.*
+*.env
+*.local
+credentials.json
+token.json
+secrets.json
+
+# Build outputs & extension packages
+dist/
+build/
+out/
+*.zip
+*.crx
+*.pem
+
+# Logs and runtime data
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor and IDE configurations
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Temporary and cache files
+.cache/
+tmp/
+temp/
+*.tmp
