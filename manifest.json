@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Gemini Extended Suite",
-  "version": "1.2.0",
-  "description": "Gemini Web UI向け作業支援ブラウザ拡張機能（フォルダ整理、最新モデル・思考モード切替、MDエクスポート、公式使用量モニター、目次等）",
+  "version": "1.3.0",
+  "description": "Gemini Web UI向け作業支援ブラウザ拡張機能（フォルダ整理、MDエクスポート、公式使用状況同期、目次ジャンプ等）",
   "icons": {
     "16": "icons/icon-16.png",
     "48": "icons/icon-48.png",
@@ -40,7 +40,6 @@
       ],
       "js": [
         "content/dom_observer.js",
-        "content/modules/model_switcher.js",
         "content/modules/sidebar_folders.js",
         "content/modules/exporter_md.js",
         "content/modules/usage_monitor.js",

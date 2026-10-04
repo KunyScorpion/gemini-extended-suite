@@ -7,7 +7,6 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   console.log('[Gemini Extended Suite] Extension installed / updated:', details.reason);
 
   const defaultSettings = {
-    enableModelSwitcher: true,
     enableSidebarFolders: true,
     enableMarkdownExport: true,
     enableUsageMonitor: true,
@@ -19,8 +18,6 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     enableTableOfContents: true,
 
     exportIncludeThinking: true,
-    selectedModel: 'flash',
-    thinkingEnabled: false,
 
     // フォルダ管理初期データ
     folders: [

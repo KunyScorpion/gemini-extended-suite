@@ -19,97 +19,7 @@
 }
 
 /* ==========================================================================
-   Feature 1: ミニマル・モデル＆思考モード選択バー（スリム＆目立たない配置）
-   ========================================================================== */
-.g-ext-model-bar-compact {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 6px;
-  margin-bottom: 6px;
-  background: rgba(30, 34, 48, 0.75);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--g-ext-radius-pill);
-  width: fit-content;
-  max-width: 100%;
-  animation: g-ext-fadeIn var(--g-ext-transition-fast) ease-out;
-  z-index: 50;
-  user-select: none;
-}
-
-body:not([data-theme="dark"]):not(.dark-theme) .g-ext-model-bar-compact {
-  background: rgba(245, 247, 250, 0.9);
-  border-color: rgba(0, 0, 0, 0.08);
-}
-
-.g-ext-model-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.g-ext-model-btn {
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--g-ext-text-muted);
-  font-size: 11px;
-  font-weight: 500;
-  padding: 3px 8px;
-  border-radius: var(--g-ext-radius-pill);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-
-.g-ext-model-btn:hover {
-  color: var(--g-ext-text);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.g-ext-model-btn.active {
-  background: var(--g-ext-primary);
-  color: #ffffff;
-  font-weight: 600;
-}
-
-.g-ext-model-divider {
-  width: 1px;
-  height: 12px;
-  background: var(--g-ext-border);
-  margin: 0 2px;
-}
-
-.g-ext-thinking-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--g-ext-text-muted);
-  font-size: 11px;
-  font-weight: 500;
-  padding: 3px 8px;
-  border-radius: var(--g-ext-radius-pill);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-
-.g-ext-thinking-btn:hover {
-  color: var(--g-ext-text);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.g-ext-thinking-btn.active {
-  background: linear-gradient(135deg, #a855f7, #6366f1);
-  color: #ffffff;
-  font-weight: 600;
-  box-shadow: 0 0 8px rgba(168, 85, 247, 0.4);
-}
-
-/* ==========================================================================
-   Feature 3: サイドバーのフォルダ管理（安定版）
+   サイドバーのフォルダ管理（安定版）
    ========================================================================== */
 .g-ext-folder-section {
   padding: 8px 12px;
@@ -418,7 +328,7 @@ body:not([data-theme="dark"]):not(.dark-theme) .g-ext-model-bar-compact {
 }
 
 /* ==========================================================================
-   Feature 4: チャット全文のMarkdownエクスポート
+   チャット全文のMarkdownエクスポート
    ========================================================================== */
 .g-ext-export-btn {
   display: inline-flex;
@@ -444,7 +354,7 @@ body:not([data-theme="dark"]):not(.dark-theme) .g-ext-model-bar-compact {
 }
 
 /* ==========================================================================
-   Feature 5: 使用量・クォータ常時インジケーター
+   公式使用量・クォータ常時インジケーター
    ========================================================================== */
 .g-ext-usage-indicator {
   position: relative;
@@ -474,7 +384,7 @@ body:not([data-theme="dark"]):not(.dark-theme) .g-ext-model-bar-compact {
 
 .g-ext-usage-meter-bar {
   height: 100%;
-  width: 1%;
+  width: 0%;
   border-radius: 3px;
   background: var(--g-ext-success);
   transition: width 0.3s ease, background 0.3s ease;
@@ -508,7 +418,7 @@ body:not([data-theme="dark"]):not(.dark-theme) .g-ext-model-bar-compact {
 }
 
 /* ==========================================================================
-   Feature 6: Chat Enhancer（目次、文字数カウンター、ワイド表示）
+   Chat Enhancer（目次、文字数カウンター、ワイド表示）
    ========================================================================== */
 .g-ext-char-counter {
   font-size: 11px;
@@ -523,7 +433,6 @@ body:not([data-theme="dark"]):not(.dark-theme) .g-ext-model-bar-compact {
   user-select: none;
 }
 
-/* 右端目次（フリッカー防止・安定化） */
 .g-ext-toc-container {
   position: fixed;
   right: 16px;

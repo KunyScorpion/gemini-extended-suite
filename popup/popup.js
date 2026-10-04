@@ -21,7 +21,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 2. 機能トグルのバインディング
   const toggles = [
-    { id: 'toggle-model-switcher', key: 'enableModelSwitcher' },
     { id: 'toggle-sidebar-folders', key: 'enableSidebarFolders' },
     { id: 'toggle-markdown-export', key: 'enableMarkdownExport' },
     { id: 'toggle-usage-monitor', key: 'enableUsageMonitor' },

@@ -4,7 +4,7 @@
  */
 
 (function () {
-  console.log('[Gemini Extended Suite] v1.2.0 initializing on Gemini Web...');
+  console.log('[Gemini Extended Suite] v1.3.0 initializing on Gemini Web...');
 
   function bootstrap() {
     if (window.geminiDomObserver) {
@@ -24,11 +24,6 @@
   // 設定変更時の即時再適用
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
-
-    if (changes.enableModelSwitcher && window.modelSwitcherModule) {
-      window.modelSwitcherModule.enabled = changes.enableModelSwitcher.newValue;
-      window.modelSwitcherModule.checkAndMount();
-    }
 
     if (changes.enableSidebarFolders && window.sidebarFoldersModule) {
       window.sidebarFoldersModule.enabled = changes.enableSidebarFolders.newValue;
