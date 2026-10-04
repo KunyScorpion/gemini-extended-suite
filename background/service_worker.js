@@ -8,7 +8,6 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
   const defaultSettings = {
     enableModelSwitcher: true,
-    enableSkillLauncher: true,
     enableSidebarFolders: true,
     enableMarkdownExport: true,
     enableUsageMonitor: true,
@@ -20,17 +19,10 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     enableTableOfContents: true,
 
     exportIncludeThinking: true,
-    selectedModel: 'flash-38',
+    selectedModel: 'flash',
+    thinkingEnabled: false,
 
-    // 2026/10 Gemini公式スキル初期候補
-    geminiOfficialSkills: [
-      { id: 's-1', name: 'ディープリサーチ', icon: '🔍', desc: 'Web上の学術・公式ソースを横断調査' },
-      { id: 's-2', name: '長編小説・シナリオ創作', icon: '📖', desc: 'プロット構成とキャラクター描写' },
-      { id: 's-3', name: 'コードレビュー＆最適化', icon: '💻', desc: 'バグ検出・リファクタリング提案' },
-      { id: 's-4', name: 'エグゼクティブ要約', icon: '⚡', desc: '長文・資料の要点箇条書き' }
-    ],
-
-    // フォルダ管理データ
+    // フォルダ管理初期データ
     folders: [
       {
         id: 'folder-default-creative',

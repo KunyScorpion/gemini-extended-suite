@@ -1,53 +1,30 @@
 /**
- * Gemini Extended Suite - Feature 1: モデル選択ワンタッチバー
- * 2026年10月最新Web版Geminiモデル（3.8 Flash / 3.1 Pro / 4 Argon / Thinking）対応
- * チャット入力ボックス直上にピル型ボタンを配置し、ワンクリックでモデルを切り替え
+ * Gemini Extended Suite - Feature 1: ミニマル・モデル＆思考モード選択バー
+ * 画像2の実装モデル（3.5 Flash-Lite / 3.8 Flash / 3.1 Pro ＋ 強化版思考モード）に完全準拠
+ * 邪魔にならないコンパクト・スリム設計
  */
 
 class ModelSwitcherModule {
   constructor() {
     this.containerId = 'g-ext-model-bar-root';
-    // 2026年10月最新Web版Geminiモデル一覧
+    
+    // 画像2に基づくモデル一覧
     this.models = [
-      {
-        id: 'flash-38',
-        name: 'Gemini 3.8 Flash',
-        tag: 'Fast',
-        badge: '⚡',
-        keywords: ['3.8 flash', 'flash', '高速']
-      },
-      {
-        id: 'pro-31',
-        name: 'Gemini 3.1 Pro',
-        tag: 'Pro',
-        badge: '🧠',
-        keywords: ['3.1 pro', 'pro', '高度']
-      },
-      {
-        id: 'argon-4',
-        name: 'Gemini 4 Argon',
-        tag: 'Frontier',
-        badge: '✨',
-        keywords: ['4 argon', 'argon', '4.0', 'ultra', 'フロンティア', 'frontier']
-      },
-      {
-        id: 'thinking-38',
-        name: 'Gemini 3.8 Thinking',
-        tag: 'Reasoning',
-        badge: '💭',
-        keywords: ['thinking', '思考', 'high', 'deep', 'extended thinking']
-      }
+      { id: 'flash-lite', name: '3.5 Lite', fullName: '3.5 Flash-Lite', keywords: ['3.5 flash-lite', 'flash-lite', 'lite'] },
+      { id: 'flash', name: '3.8 Flash', fullName: '3.8 Flash', keywords: ['3.8 flash', '3.8', 'flash'] },
+      { id: 'pro', name: '3.1 Pro', fullName: '3.1 Pro', keywords: ['3.1 pro', '3.1', 'pro'] }
     ];
-    this.currentModelId = 'flash-38';
+
+    this.currentModelId = 'flash';
+    this.isThinkingEnabled = false;
     this.enabled = true;
   }
 
   async init() {
-    const settings = await chrome.storage.local.get(['enableModelSwitcher', 'selectedModel']);
+    const settings = await chrome.storage.local.get(['enableModelSwitcher', 'selectedModel', 'thinkingEnabled']);
     this.enabled = settings.enableModelSwitcher !== false;
-    if (settings.selectedModel) {
-      this.currentModelId = settings.selectedModel;
-    }
+    if (settings.selectedModel) this.currentModelId = settings.selectedModel;
+    if (settings.thinkingEnabled !== undefined) this.isThinkingEnabled = settings.thinkingEnabled;
   }
 
   checkAndMount() {
@@ -62,29 +39,28 @@ class ModelSwitcherModule {
       return;
     }
 
-    const inputContainer = this.findInputContainer();
-    if (!inputContainer) return;
+    const targetAnchor = this.findMountAnchor();
+    if (!targetAnchor) return;
 
-    this.mountUI(inputContainer);
+    this.mountUI(targetAnchor);
   }
 
-  findInputContainer() {
+  /**
+   * 邪魔にならない入力枠の周辺アンカーを探索
+   */
+  findMountAnchor() {
     const selectors = [
       '.input-area-container',
       '.chat-input-container',
       'rich-textarea',
       '[class*="input-box"]',
-      '[class*="bottom-container"]',
       'form[class*="query"]',
-      'footer',
-      '[role="region"][aria-label*="プロンプト"]'
+      '[class*="bottom-container"]'
     ];
 
     for (const sel of selectors) {
       const el = document.querySelector(sel);
-      if (el) {
-        return el.parentElement || el;
-      }
+      if (el) return el.parentElement || el;
     }
     return null;
   }
@@ -92,45 +68,54 @@ class ModelSwitcherModule {
   mountUI(parent) {
     const bar = document.createElement('div');
     bar.id = this.containerId;
-    bar.className = 'g-ext-model-bar-container';
+    bar.className = 'g-ext-model-bar-compact';
 
-    const label = document.createElement('span');
-    label.className = 'g-ext-model-bar-label';
-    label.textContent = '⚡ MODEL:';
-    bar.appendChild(label);
+    // モデルボタングループ
+    const modelGroup = document.createElement('div');
+    modelGroup.className = 'g-ext-model-group';
 
     this.models.forEach((m) => {
-      const pill = document.createElement('button');
-      pill.type = 'button';
-      pill.className = `g-ext-model-pill ${m.id === this.currentModelId ? 'active' : ''}`;
-      pill.dataset.modelId = m.id;
-      pill.title = `${m.name} (${m.tag})`;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `g-ext-model-btn ${m.id === this.currentModelId ? 'active' : ''}`;
+      btn.dataset.modelId = m.id;
+      btn.textContent = m.name;
+      btn.title = `${m.fullName} に切り替え`;
 
-      const badge = document.createElement('span');
-      badge.textContent = m.badge;
-      badge.style.fontSize = '12px';
-
-      const dot = document.createElement('span');
-      dot.className = 'g-ext-model-pill-dot';
-
-      const text = document.createElement('span');
-      text.textContent = m.name;
-
-      pill.appendChild(badge);
-      pill.appendChild(dot);
-      pill.appendChild(text);
-
-      pill.addEventListener('click', (e) => {
+      btn.addEventListener('click', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         this.selectModel(m);
       });
 
-      bar.appendChild(pill);
+      modelGroup.appendChild(btn);
     });
+
+    // セパレータ
+    const divider = document.createElement('div');
+    divider.className = 'g-ext-model-divider';
+
+    // 強化版思考モード トグルボタン
+    const thinkingBtn = document.createElement('button');
+    thinkingBtn.type = 'button';
+    thinkingBtn.id = 'g-ext-btn-thinking-toggle';
+    thinkingBtn.className = `g-ext-thinking-btn ${this.isThinkingEnabled ? 'active' : ''}`;
+    thinkingBtn.innerHTML = `<span>🧠</span><span>思考モード</span>`;
+    thinkingBtn.title = '強化版思考モード（複雑な問題の解決）のON/OFF切り替え';
+
+    thinkingBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.toggleThinkingMode();
+    });
+
+    bar.appendChild(modelGroup);
+    bar.appendChild(divider);
+    bar.appendChild(thinkingBtn);
 
     parent.insertBefore(bar, parent.firstChild);
     this.syncActiveState();
-    console.log('[Gemini Extended Suite] 2026/10 Model Switcher Bar mounted');
+    console.log('[Gemini Extended Suite] Compact Model Switcher mounted');
   }
 
   removeUI() {
@@ -142,33 +127,48 @@ class ModelSwitcherModule {
     const container = document.getElementById(this.containerId);
     if (!container) return;
 
-    // 公式UIの現在の選択テキストを検出
-    const officialSelectors = [
-      '[aria-label*="モデル"]',
-      '[data-test-id*="model"]',
-      '.model-selector-button',
-      '[class*="model-pill"]',
-      'button[aria-haspopup="menu"]:has([class*="model"])'
-    ];
+    // 公式UIのモデルドロップダウンボタンのテキストを検出
+    const officialTrigger = this.findOfficialDropdownTrigger();
+    if (officialTrigger) {
+      const text = (officialTrigger.textContent || '').toLowerCase();
+      
+      const matched = this.models.find(m => m.keywords.some(k => text.includes(k)));
+      if (matched && matched.id !== this.currentModelId) {
+        this.currentModelId = matched.id;
+      }
 
-    for (const sel of officialSelectors) {
-      const el = document.querySelector(sel);
-      if (el) {
-        const text = (el.textContent || el.getAttribute('aria-label') || '').toLowerCase();
-        const matched = this.models.find(m => m.keywords.some(k => text.includes(k)));
-        if (matched && matched.id !== this.currentModelId) {
-          this.currentModelId = matched.id;
-          break;
-        }
+      // 思考モード（テキストに「思考」や「thinking」が含まれるか判定）
+      if (text.includes('思考') || text.includes('thinking')) {
+        this.isThinkingEnabled = true;
       }
     }
 
-    container.querySelectorAll('.g-ext-model-pill').forEach(pill => {
-      if (pill.dataset.modelId === this.currentModelId) {
-        pill.classList.add('active');
+    // ボタンのハイライト更新
+    container.querySelectorAll('.g-ext-model-btn').forEach(btn => {
+      if (btn.dataset.modelId === this.currentModelId) {
+        btn.classList.add('active');
       } else {
-        pill.classList.remove('active');
+        btn.classList.remove('active');
       }
+    });
+
+    const thinkingBtn = container.querySelector('#g-ext-btn-thinking-toggle');
+    if (thinkingBtn) {
+      if (this.isThinkingEnabled) {
+        thinkingBtn.classList.add('active');
+      } else {
+        thinkingBtn.classList.remove('active');
+      }
+    }
+  }
+
+  findOfficialDropdownTrigger() {
+    const buttons = Array.from(document.querySelectorAll('button, div[role="button"]'));
+    return buttons.find(b => {
+      const txt = (b.textContent || '').trim();
+      const aria = (b.getAttribute('aria-label') || '').trim();
+      return (txt.includes('Flash') || txt.includes('Pro') || txt.includes('Lite') || aria.includes('モデル') || aria.includes('Model'))
+             && (b.getAttribute('aria-haspopup') === 'menu' || b.querySelector('svg, mat-icon') || b.textContent.includes('˅') || b.textContent.includes('expand_more'));
     });
   }
 
@@ -177,44 +177,47 @@ class ModelSwitcherModule {
     chrome.storage.local.set({ selectedModel: model.id });
     this.syncActiveState();
 
-    console.log(`[Gemini Extended Suite] Switching model to: ${model.name}`);
-    await this.triggerOfficialModelSwitch(model);
+    console.log(`[Gemini Extended Suite] Switching model to: ${model.fullName}`);
+    await this.triggerOfficialSelection(model.keywords);
   }
 
-  async triggerOfficialModelSwitch(model) {
-    // 1. 公式ドロップダウントリガーボタンを探す
-    const triggers = Array.from(document.querySelectorAll('button, div[role="button"]'))
-      .filter(el => {
-        const label = (el.getAttribute('aria-label') || el.textContent || '').toLowerCase();
-        return (label.includes('model') || label.includes('モデル') || label.includes('gemini') || label.includes('flash') || label.includes('pro'))
-          && (el.getAttribute('aria-haspopup') === 'menu' || el.getAttribute('aria-expanded') !== null || el.classList.value.includes('selector'));
-      });
+  async toggleThinkingMode() {
+    this.isThinkingEnabled = !this.isThinkingEnabled;
+    chrome.storage.local.set({ thinkingEnabled: this.isThinkingEnabled });
+    this.syncActiveState();
 
-    const trigger = triggers[0] || document.querySelector('[aria-label*="モデル"], [data-test-id*="model-picker"]');
+    console.log(`[Gemini Extended Suite] Toggling thinking mode: ${this.isThinkingEnabled ? 'ON' : 'OFF'}`);
+    await this.triggerOfficialSelection(['思考', '強化版思考', 'thinking']);
+  }
+
+  async triggerOfficialSelection(keywords) {
+    const trigger = this.findOfficialDropdownTrigger();
     if (!trigger) {
-      console.warn('[Gemini Extended Suite] Official model trigger not found in DOM');
+      console.warn('[Gemini Extended Suite] Official dropdown trigger not found');
       return;
     }
 
     try {
+      // 1. ドロップダウンを開く
       trigger.click();
       await new Promise(r => setTimeout(r, 150));
 
-      const menuItems = Array.from(document.querySelectorAll('[role="menuitem"], [role="option"], mat-option, div[class*="menu-item"], div[class*="item"]'));
+      // 2. メニュー項目を探索
+      const menuItems = Array.from(document.querySelectorAll('[role="menuitem"], [role="option"], mat-option, div[class*="menu-item"]'));
       const targetItem = menuItems.find(item => {
         const text = (item.textContent || '').toLowerCase();
-        return model.keywords.some(k => text.includes(k));
+        return keywords.some(k => text.includes(k.toLowerCase()));
       });
 
       if (targetItem) {
         targetItem.click();
-        console.log(`[Gemini Extended Suite] Selected model menu item for ${model.name}`);
+        console.log('[Gemini Extended Suite] Successfully selected official menu item');
       } else {
-        // メニュー外クリックで閉じる
+        // メニューを閉じる
         document.body.click();
       }
     } catch (err) {
-      console.error('[Gemini Extended Suite] Error during model switch simulation:', err);
+      console.error('[Gemini Extended Suite] Model switch simulation error:', err);
     }
   }
 }

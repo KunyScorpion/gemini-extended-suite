@@ -19,213 +19,97 @@
 }
 
 /* ==========================================================================
-   Feature 1: モデル選択ワンタッチバー
+   Feature 1: ミニマル・モデル＆思考モード選択バー（スリム＆目立たない配置）
    ========================================================================== */
-.g-ext-model-bar-container {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  margin-bottom: 8px;
-  background: var(--g-ext-surface);
-  border: 1px solid var(--g-ext-border);
-  border-radius: var(--g-ext-radius-pill);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-  width: fit-content;
-  max-width: 100%;
-  overflow-x: auto;
-  scrollbar-width: none;
-  animation: g-ext-fadeIn var(--g-ext-transition-fast) ease-out;
-  z-index: 100;
-}
-.g-ext-model-bar-container::-webkit-scrollbar {
-  display: none;
-}
-
-.g-ext-model-bar-label {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--g-ext-text-muted);
-  margin-right: 4px;
-  white-space: nowrap;
-}
-
-.g-ext-model-pill {
+.g-ext-model-bar-compact {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
+  gap: 4px;
+  padding: 3px 6px;
+  margin-bottom: 6px;
+  background: rgba(30, 34, 48, 0.75);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--g-ext-radius-pill);
-  border: 1px solid var(--g-ext-border);
-  background: var(--g-ext-bg);
-  color: var(--g-ext-text);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--g-ext-transition-fast);
-  white-space: nowrap;
+  width: fit-content;
+  max-width: 100%;
+  animation: g-ext-fadeIn var(--g-ext-transition-fast) ease-out;
+  z-index: 50;
   user-select: none;
 }
 
-.g-ext-model-pill:hover {
-  background: var(--g-ext-surface-hover);
-  border-color: var(--g-ext-primary);
-  transform: translateY(-1px);
+body:not([data-theme="dark"]):not(.dark-theme) .g-ext-model-bar-compact {
+  background: rgba(245, 247, 250, 0.9);
+  border-color: rgba(0, 0, 0, 0.08);
 }
 
-.g-ext-model-pill.active {
-  background: linear-gradient(135deg, var(--g-ext-primary), var(--g-ext-accent));
-  color: #ffffff;
-  border-color: transparent;
-  box-shadow: 0 0 12px var(--g-ext-primary-glow);
-}
-
-.g-ext-model-pill-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--g-ext-text-muted);
-  transition: background var(--g-ext-transition-fast);
-}
-
-.g-ext-model-pill.active .g-ext-model-pill-dot {
-  background: #ffffff;
-  box-shadow: 0 0 6px #ffffff;
-}
-
-/* ==========================================================================
-   Feature 2: スキル・タスク コマンドランチャー
-   ========================================================================== */
-.g-ext-skill-launcher-wrap {
-  position: relative;
+.g-ext-model-group {
   display: inline-flex;
   align-items: center;
-  margin-top: 4px;
+  gap: 2px;
 }
 
-.g-ext-skill-toggle-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  border-radius: var(--g-ext-radius-md);
-  border: 1px solid var(--g-ext-primary);
+.g-ext-model-btn {
   background: transparent;
-  color: var(--g-ext-primary);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--g-ext-transition-fast);
-  white-space: nowrap;
-}
-
-.g-ext-skill-toggle-btn:hover {
-  background: var(--g-ext-primary-glow);
-  color: #ffffff;
-}
-
-/* ポータル配置されるスキルパレット（fixed、親のoverflow:hiddenを回避） */
-.g-ext-skill-palette.g-ext-portal-mode {
-  width: 320px;
-  max-height: 400px;
-  background: var(--g-ext-surface);
-  border: 1px solid var(--g-ext-border);
-  border-radius: var(--g-ext-radius-lg);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
-  padding: 8px;
-  display: none;
-  flex-direction: column;
-  gap: 4px;
-  backdrop-filter: blur(16px);
-  animation: g-ext-scaleUp 0.18s ease-out;
-}
-
-.g-ext-skill-palette.g-ext-portal-mode.open {
-  display: flex !important;
-}
-
-.g-ext-skill-palette-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 8px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--g-ext-text);
-  border-bottom: 1px solid var(--g-ext-border);
-}
-
-.g-ext-btn-tiny {
-  background: var(--g-ext-surface-hover);
-  border: 1px solid var(--g-ext-border);
-  color: var(--g-ext-text);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 10px;
-  cursor: pointer;
-}
-.g-ext-btn-tiny:hover {
-  border-color: var(--g-ext-primary);
-  color: var(--g-ext-primary);
-}
-
-.g-ext-skill-list-wrap {
-  max-height: 250px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 4px 0;
-}
-
-.g-ext-skill-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: var(--g-ext-radius-sm);
-  cursor: pointer;
-  transition: background var(--g-ext-transition-fast);
-  text-align: left;
-}
-
-.g-ext-skill-item:hover, .g-ext-skill-item.selected {
-  background: var(--g-ext-surface-hover);
-}
-
-.g-ext-skill-icon {
-  font-size: 18px;
-  line-height: 1;
-}
-
-.g-ext-skill-content {
-  flex: 1;
-  overflow: hidden;
-}
-
-.g-ext-skill-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--g-ext-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.g-ext-skill-desc {
-  font-size: 11px;
+  border: 1px solid transparent;
   color: var(--g-ext-text-muted);
-  margin-top: 2px;
-  line-height: 1.2;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: var(--g-ext-radius-pill);
+  cursor: pointer;
+  transition: all 0.15s ease;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+.g-ext-model-btn:hover {
+  color: var(--g-ext-text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.g-ext-model-btn.active {
+  background: var(--g-ext-primary);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.g-ext-model-divider {
+  width: 1px;
+  height: 12px;
+  background: var(--g-ext-border);
+  margin: 0 2px;
+}
+
+.g-ext-thinking-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--g-ext-text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: var(--g-ext-radius-pill);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.g-ext-thinking-btn:hover {
+  color: var(--g-ext-text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.g-ext-thinking-btn.active {
+  background: linear-gradient(135deg, #a855f7, #6366f1);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 0 8px rgba(168, 85, 247, 0.4);
 }
 
 /* ==========================================================================
-   Feature 3: サイドバーのフォルダ管理 ＆ ハイブリッド一括リネーム
+   Feature 3: サイドバーのフォルダ管理（安定版）
    ========================================================================== */
 .g-ext-folder-section {
   padding: 8px 12px;
@@ -285,17 +169,11 @@
   border-radius: var(--g-ext-radius-sm);
   cursor: pointer;
   user-select: none;
-  transition: all var(--g-ext-transition-fast);
+  transition: background var(--g-ext-transition-fast);
 }
 
 .g-ext-folder-header:hover {
   background: var(--g-ext-surface-hover);
-}
-
-.g-ext-folder-header.drag-over {
-  outline: 2px dashed var(--g-ext-primary) !important;
-  background: var(--g-ext-primary-glow) !important;
-  transform: scale(1.02);
 }
 
 .g-ext-folder-toggle-icon {
@@ -307,7 +185,7 @@
 }
 
 .g-ext-folder-name {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--g-ext-text);
   flex: 1;
@@ -354,7 +232,7 @@
 /* スレッドホバー時のクイックフォルダ移動ボタン */
 .g-ext-quick-folder-btn {
   position: absolute;
-  right: 36px;
+  right: 32px;
   top: 50%;
   transform: translateY(-50%);
   background: var(--g-ext-surface);
@@ -365,22 +243,22 @@
   font-size: 11px;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, background 0.15s;
   z-index: 10;
 }
 
-*:hover > .g-ext-quick-folder-btn {
-  opacity: 0.85;
+*:hover > .g-ext-quick-folder-btn,
+.g-ext-quick-folder-btn:hover {
+  opacity: 0.95;
 }
 .g-ext-quick-folder-btn:hover {
-  opacity: 1;
   border-color: var(--g-ext-primary);
   background: var(--g-ext-surface-hover);
 }
 
 /* フォルダ選択ドロップダウンメニュー */
 .g-ext-thread-folder-menu {
-  width: 180px;
+  width: 190px;
   background: var(--g-ext-surface);
   border: 1px solid var(--g-ext-border);
   border-radius: var(--g-ext-radius-md);
@@ -424,7 +302,7 @@
 
 .g-ext-modal {
   width: 90%;
-  max-width: 520px;
+  max-width: 480px;
   background: var(--g-ext-surface);
   border: 1px solid var(--g-ext-border);
   border-radius: var(--g-ext-radius-lg);
@@ -445,7 +323,7 @@
 }
 
 .g-ext-modal-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--g-ext-text);
 }
@@ -486,18 +364,6 @@
   box-shadow: 0 0 0 2px var(--g-ext-primary-glow);
 }
 
-.g-ext-thread-checklist {
-  max-height: 180px;
-  overflow-y: auto;
-  border: 1px solid var(--g-ext-border);
-  border-radius: var(--g-ext-radius-sm);
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  background: var(--g-ext-bg);
-}
-
 .g-ext-checkbox-item {
   display: flex;
   align-items: center;
@@ -505,22 +371,6 @@
   font-size: 12px;
   color: var(--g-ext-text);
   cursor: pointer;
-}
-
-.g-ext-progress-bar-wrap {
-  width: 100%;
-  height: 8px;
-  background: var(--g-ext-border);
-  border-radius: 4px;
-  overflow: hidden;
-  margin-top: 6px;
-}
-
-.g-ext-progress-bar-inner {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, var(--g-ext-primary), var(--g-ext-accent));
-  transition: width 0.3s ease;
 }
 
 .g-ext-modal-actions {
@@ -531,9 +381,9 @@
 }
 
 .g-ext-btn {
-  padding: 8px 16px;
+  padding: 7px 14px;
   border-radius: var(--g-ext-radius-md);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   border: none;
@@ -551,6 +401,20 @@
 }
 .g-ext-btn-primary:hover {
   background: var(--g-ext-primary-hover);
+}
+
+.g-ext-btn-tiny {
+  background: var(--g-ext-surface-hover);
+  border: 1px solid var(--g-ext-border);
+  color: var(--g-ext-text);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  cursor: pointer;
+}
+.g-ext-btn-tiny:hover {
+  border-color: var(--g-ext-primary);
+  color: var(--g-ext-primary);
 }
 
 /* ==========================================================================
@@ -610,7 +474,7 @@
 
 .g-ext-usage-meter-bar {
   height: 100%;
-  width: 100%;
+  width: 1%;
   border-radius: 3px;
   background: var(--g-ext-success);
   transition: width 0.3s ease, background 0.3s ease;
@@ -628,7 +492,7 @@
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  width: 240px;
+  width: 250px;
   background: var(--g-ext-surface);
   border: 1px solid var(--g-ext-border);
   border-radius: var(--g-ext-radius-md);
@@ -636,7 +500,7 @@
   padding: 12px;
   display: none;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   z-index: 1000;
 }
 .g-ext-usage-popover.open {
@@ -659,10 +523,11 @@
   user-select: none;
 }
 
+/* 右端目次（フリッカー防止・安定化） */
 .g-ext-toc-container {
   position: fixed;
   right: 16px;
-  top: 80px;
+  top: 76px;
   width: 220px;
   max-height: 70vh;
   background: var(--g-ext-surface);
@@ -672,24 +537,27 @@
   display: flex;
   flex-direction: column;
   z-index: 980;
-  transition: transform var(--g-ext-transition-fast), width var(--g-ext-transition-fast);
-  backdrop-filter: blur(10px);
+  transition: width 0.2s ease;
+  backdrop-filter: blur(12px);
+  backface-visibility: hidden;
+  will-change: width;
 }
 
 .g-ext-toc-container.collapsed {
-  width: 38px;
+  width: 44px;
 }
 
 .g-ext-toc-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
+  padding: 7px 10px;
   border-bottom: 1px solid var(--g-ext-border);
   font-size: 12px;
   font-weight: 700;
   color: var(--g-ext-text);
   cursor: pointer;
+  user-select: none;
 }
 
 .g-ext-toc-container.collapsed .g-ext-toc-header span:first-child {
@@ -701,7 +569,8 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
+  max-height: calc(70vh - 40px);
 }
 .g-ext-toc-container.collapsed .g-ext-toc-list {
   display: none;
@@ -710,13 +579,13 @@
 .g-ext-toc-item {
   font-size: 11px;
   color: var(--g-ext-text-muted);
-  padding: 4px 8px;
+  padding: 5px 8px;
   border-radius: 4px;
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: all var(--g-ext-transition-fast);
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .g-ext-toc-item:hover {

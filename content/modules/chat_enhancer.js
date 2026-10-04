@@ -1,6 +1,6 @@
 /**
- * Gemini Extended Suite - Feature 6: エディタ・ナビゲーション快適化機能 (Chat Enhancer)
- * 目次・ミニマップ(Jump to Turn)、ワイド表示トグル、入力文字数カウンター、生成完了デスクトップ通知
+ * Gemini Extended Suite - Feature 6: Chat Enhancer
+ * 目次ミニマップ（高速点滅フリッカー解消・確実なジャンプ）、ワイド表示、文字数カウント、通知
  */
 
 class ChatEnhancerModule {
@@ -17,6 +17,7 @@ class ChatEnhancerModule {
 
     this.isGenerating = false;
     this.generationCheckInterval = null;
+    this.lastTocSignature = ''; // フリッカー防止用のDOMシグネチャ
   }
 
   async init() {
@@ -34,10 +35,7 @@ class ChatEnhancerModule {
     this.enableToc = data.enableTableOfContents !== false;
     this.enableNotification = data.enableDesktopNotifications !== false;
 
-    // ワイドモード初期適用
     this.applyFullWidth(this.fullWidth);
-
-    // 回答生成状態の監視（通知用）
     this.startGenerationWatcher();
   }
 
@@ -52,9 +50,6 @@ class ChatEnhancerModule {
     this.mountFullWidthToggle();
   }
 
-  /* ---------------------------------------------------------
-     1. ワイド表示トグル (Full-Width Mode)
-     --------------------------------------------------------- */
   applyFullWidth(enabled) {
     if (enabled) {
       document.body.classList.add('g-ext-full-width-enabled');
@@ -66,14 +61,19 @@ class ChatEnhancerModule {
   mountFullWidthToggle() {
     if (document.getElementById(this.fullWidthBtnId)) return;
 
-    const header = document.querySelector('header [class*="actions"], header, .top-bar-container');
-    if (!header) return;
+    // 右上フローティングバーまたはヘッダーに配置
+    let utilBar = document.getElementById('g-ext-top-floating-bar');
+    if (!utilBar) {
+      utilBar = document.createElement('div');
+      utilBar.id = 'g-ext-top-floating-bar';
+      utilBar.className = 'g-ext-top-floating-bar';
+      document.body.appendChild(utilBar);
+    }
 
     const btn = document.createElement('button');
     btn.id = this.fullWidthBtnId;
     btn.type = 'button';
     btn.className = 'g-ext-export-btn';
-    btn.style.marginLeft = '4px';
     btn.innerHTML = `<span>⤢</span><span>ワイド</span>`;
     btn.title = '全幅ワイド表示の切り替え (85%〜100%)';
 
@@ -84,12 +84,9 @@ class ChatEnhancerModule {
       btn.style.borderColor = this.fullWidth ? 'var(--g-ext-primary)' : 'var(--g-ext-border)';
     });
 
-    header.appendChild(btn);
+    utilBar.appendChild(btn);
   }
 
-  /* ---------------------------------------------------------
-     2. 入力文字数カウンター
-     --------------------------------------------------------- */
   mountCharCounter() {
     if (!this.enableCharCount) return;
     if (document.getElementById(this.charCounterId)) return;
@@ -100,12 +97,11 @@ class ChatEnhancerModule {
     const counter = document.createElement('div');
     counter.id = this.charCounterId;
     counter.className = 'g-ext-char-counter';
-    counter.innerHTML = `文字: 0 | 行: 1`;
+    counter.innerHTML = `0 字 | 1 行`;
 
     const targetParent = inputWrap.parentElement || inputWrap;
     targetParent.appendChild(counter);
 
-    // 入力監視
     document.addEventListener('input', (e) => {
       const target = e.target;
       if (!target || (!target.isContentEditable && target.tagName !== 'TEXTAREA')) return;
@@ -114,12 +110,12 @@ class ChatEnhancerModule {
       const charCount = text ? text.replace(/\n$/, '').length : 0;
       const lineCount = text && charCount > 0 ? text.split('\n').length : 1;
 
-      counter.innerHTML = `文字: ${charCount} | 行: ${lineCount}`;
+      counter.innerHTML = `${charCount} 字 | ${lineCount} 行`;
     });
   }
 
   /* ---------------------------------------------------------
-     3. チャット内目次（Jump to Turn）
+     目次ミニマップ（高速点滅フリッカー解消 ＆ スムーズジャンプ）
      --------------------------------------------------------- */
   mountTableOfContents() {
     if (!this.enableToc) return;
@@ -133,12 +129,13 @@ class ChatEnhancerModule {
       toc.innerHTML = `
         <div class="g-ext-toc-header" id="g-ext-toc-toggle-header">
           <span>📑 目次</span>
-          <span>≡</span>
+          <span style="font-size:10px;">▼</span>
         </div>
         <div class="g-ext-toc-list" id="g-ext-toc-list-body"></div>
       `;
 
-      toc.querySelector('#g-ext-toc-toggle-header').addEventListener('click', () => {
+      toc.querySelector('#g-ext-toc-toggle-header').addEventListener('click', (e) => {
+        e.stopPropagation();
         toc.classList.toggle('collapsed');
       });
 
@@ -152,67 +149,76 @@ class ChatEnhancerModule {
     const listBody = document.getElementById('g-ext-toc-list-body');
     if (!listBody) return;
 
+    // ユーザー質問要素の収集
+    const userQueryElements = Array.from(document.querySelectorAll(
+      '[class*="user-query"], .user-query, [data-role="user"], message-content:has([class*="user"]), [class*="user-turn"]'
+    )).filter(el => (el.textContent || '').trim().length > 0);
+
+    // シグネチャを作成し、変更がない場合はDOMを再描画しない（フリッカーを完全防止！）
+    const signature = userQueryElements.map(el => (el.textContent || '').trim().slice(0, 30)).join('||');
+    if (signature === this.lastTocSignature && listBody.children.length > 0) {
+      return; // 変更なしのためスキップ
+    }
+    this.lastTocSignature = signature;
+
     listBody.innerHTML = '';
 
-    // ユーザーの発言要素を探索
-    const userQueries = document.querySelectorAll(
-      '[class*="user-query"], .user-query, [data-role="user"], message-content:has([class*="user"])'
-    );
-
-    if (userQueries.length === 0) {
-      listBody.innerHTML = `<span style="font-size:11px;color:var(--g-ext-text-muted);padding:4px;">ターンがありません</span>`;
+    if (userQueryElements.length === 0) {
+      listBody.innerHTML = `<span style="font-size:11px;color:var(--g-ext-text-muted);padding:4px;">発言がありません</span>`;
       return;
     }
 
-    userQueries.forEach((qEl, idx) => {
-      const text = (qEl.innerText || '').trim();
-      const preview = text.length > 25 ? text.slice(0, 25) + '…' : text;
+    userQueryElements.forEach((qEl, idx) => {
+      const text = (qEl.innerText || qEl.textContent || '').trim();
+      const preview = text.length > 22 ? text.slice(0, 22) + '…' : text;
 
       const item = document.createElement('div');
       item.className = 'g-ext-toc-item';
-      item.textContent = `${idx + 1}. ${preview || 'メッセージ'}`;
+      item.innerHTML = `<span style="color:var(--g-ext-primary);font-weight:700;margin-right:4px;">#${idx + 1}</span><span>${preview || '質問'}</span>`;
       item.title = text;
 
-      item.addEventListener('click', () => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // 対象要素へスムーズスクロール
         qEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // 一瞬ハイライト
+        qEl.style.transition = 'outline 0.2s ease';
+        qEl.style.outline = '2px solid var(--g-ext-primary)';
+        setTimeout(() => {
+          qEl.style.outline = 'none';
+        }, 1200);
       });
 
       listBody.appendChild(item);
     });
   }
 
-  /* ---------------------------------------------------------
-     4. 生成完了デスクトップ通知
-     --------------------------------------------------------- */
   startGenerationWatcher() {
     if (this.generationCheckInterval) clearInterval(this.generationCheckInterval);
 
     this.generationCheckInterval = setInterval(() => {
       if (!this.enableNotification) return;
 
-      // 生成中インジケータ（停止ボタンやプログレスバーの存在）
       const stopBtn = document.querySelector('button[aria-label*="停止"], button[aria-label*="Stop"], .stop-button, mat-progress-bar');
       const nowGenerating = !!stopBtn;
 
       if (this.isGenerating && !nowGenerating) {
-        // 生成完了を検知！
         if (document.hidden) {
-          this.triggerCompletionNotification();
+          chrome.runtime.sendMessage({
+            type: 'SHOW_NOTIFICATION',
+            payload: {
+              title: 'Gemini 回答完了',
+              body: 'バックグラウンドで待機中の回答生成が完了しました。'
+            }
+          });
         }
       }
 
       this.isGenerating = nowGenerating;
     }, 800);
-  }
-
-  triggerCompletionNotification() {
-    chrome.runtime.sendMessage({
-      type: 'SHOW_NOTIFICATION',
-      payload: {
-        title: 'Gemini 回答完了',
-        body: 'バックグラウンドで待機中のプロンプトの回答生成が完了しました。'
-      }
-    });
   }
 
   removeUI() {

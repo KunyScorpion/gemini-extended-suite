@@ -12,16 +12,15 @@
       <img src="../icons/icon-48.png" alt="Icon" class="brand-icon">
       <div>
         <div class="brand-title">Gemini Extended Suite</div>
-        <div class="brand-sub">Post-2026/10 Architecture v1.1.0</div>
+        <div class="brand-sub">Post-2026/10 Architecture v1.2.0</div>
       </div>
     </div>
   </header>
 
   <nav class="popup-tabs">
     <button type="button" class="tab-btn active" data-tab="features">機能設定</button>
-    <button type="button" class="tab-btn" data-tab="skills">公式スキル</button>
     <button type="button" class="tab-btn" data-tab="backup">バックアップ</button>
-    <button type="button" class="tab-btn" data-tab="shortcuts">ヘルプ</button>
+    <button type="button" class="tab-btn" data-tab="shortcuts">使い方ガイド</button>
   </nav>
 
   <!-- タブ 1: 機能設定 -->
@@ -30,19 +29,13 @@
       <div class="group-title">メイン拡張モジュール</div>
 
       <label class="toggle-row">
-        <span>⚡ モデル選択ワンタッチバー</span>
+        <span>⚡ モデル＆思考モード切替バー</span>
         <input type="checkbox" id="toggle-model-switcher" checked>
         <span class="switch"></span>
       </label>
 
       <label class="toggle-row">
-        <span>⚡ 公式スキル (@Skills) ランチャー</span>
-        <input type="checkbox" id="toggle-skill-launcher" checked>
-        <span class="switch"></span>
-      </label>
-
-      <label class="toggle-row">
-        <span>📁 サイドバー フォルダ＆一括リネーム</span>
+        <span>📁 サイドバー フォルダ管理 (クイック移動)</span>
         <input type="checkbox" id="toggle-sidebar-folders" checked>
         <span class="switch"></span>
       </label>
@@ -54,7 +47,7 @@
       </label>
 
       <label class="toggle-row">
-        <span>📊 使用量・クォータ常時インジケーター</span>
+        <span>📊 公式使用量・クォータ常時インジケーター</span>
         <input type="checkbox" id="toggle-usage-monitor" checked>
         <span class="switch"></span>
       </label>
@@ -89,27 +82,12 @@
     </section>
   </main>
 
-  <!-- タブ 2: 公式スキル管理 -->
-  <main class="tab-content" id="tab-skills">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <span style="font-size:12px;font-weight:700;">登録済み公式スキル (@Skills)</span>
-      <div style="display:flex;gap:4px;">
-        <button type="button" class="btn btn-sm btn-secondary" id="btn-open-skills-page">公式設定を開く ↗</button>
-        <button type="button" class="btn btn-sm btn-primary" id="btn-add-skill">+ 登録</button>
-      </div>
-    </div>
-    <div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">
-      チャット画面の「⚡ スキル」ボタンからワンクリックで @メンション呼び出しできます。
-    </div>
-    <div class="skill-list" id="popup-skill-list"></div>
-  </main>
-
-  <!-- タブ 3: バックアップ -->
+  <!-- タブ 2: バックアップ -->
   <main class="tab-content" id="tab-backup">
     <div class="setting-group">
       <div class="group-title">フォルダ・設定データの保存</div>
       <p style="font-size:11px;color:#94a3b8;margin-bottom:12px;">
-        作成したフォルダ構造や公式スキルキャッシュをJSONファイルとして書き出し・読み込みできます。
+        作成したフォルダ分類構造や設定データをJSONファイルとして安全にバックアップ・復元できます。
       </p>
       <div style="display:flex;gap:8px;">
         <button type="button" class="btn btn-primary" style="flex:1;" id="btn-export-backup">JSONエクスポート</button>
@@ -120,24 +98,28 @@
     </div>
   </main>
 
-  <!-- タブ 4: ショートカット・ヘルプ -->
+  <!-- タブ 3: ショートカット・ヘルプ -->
   <main class="tab-content" id="tab-shortcuts">
     <div class="shortcut-list">
       <div class="shortcut-item">
-        <span class="shortcut-key">⚡ MODEL</span>
-        <span class="shortcut-desc">入力欄直上のピルで 3.8 Flash / 3.1 Pro / 4 Argon を即時切替</span>
+        <span class="shortcut-key">3.5 / 3.8 / 3.1</span>
+        <span class="shortcut-desc">入力枠直上のスリムバーでモデル切替</span>
       </div>
       <div class="shortcut-item">
-        <span class="shortcut-key">⚡ スキル</span>
-        <span class="shortcut-desc">ワンクリックで公式スキルを @メンション呼び出し</span>
+        <span class="shortcut-key">🧠 思考モード</span>
+        <span class="shortcut-desc">強化版思考モードのワンクリックON/OFF</span>
       </div>
       <div class="shortcut-item">
-        <span class="shortcut-key">📁 D&D / 📁</span>
-        <span class="shortcut-desc">スレッドのD&Dまたはホバー時の📁アイコンでフォルダ移動</span>
+        <span class="shortcut-key">📁</span>
+        <span class="shortcut-desc">スレッド横の📁ボタンでワンクリックフォルダ移動</span>
       </div>
       <div class="shortcut-item">
         <span class="shortcut-key">📥 MD保存</span>
-        <span class="shortcut-desc">画面右上ユーティリティバーからワンクリック出力</span>
+        <span class="shortcut-desc">右上バーからThinking込みMarkdownを一括出力</span>
+      </div>
+      <div class="shortcut-item">
+        <span class="shortcut-key">📑 目次</span>
+        <span class="shortcut-desc">右端の目次で過去の質問へ即座にスムーズスクロール</span>
       </div>
     </div>
   </main>

@@ -1,16 +1,14 @@
 /**
- * Gemini Extended Suite - Feature 3: サイドバーのフォルダ管理 ＆ ハイブリッド一括リネーム
- * D&Dの確実なイベント伝播 ＋ ワンクリック「フォルダへ移動」メニュー搭載
+ * Gemini Extended Suite - Feature 3: サイドバーのフォルダ管理（安定版）
+ * D&Dおよび一括リネームを完全撤去し、確実・軽快に動作する「📁 クイック移動ボタン」に一本化
  */
 
 class SidebarFoldersModule {
   constructor() {
     this.containerId = 'g-ext-sidebar-folder-root';
-    this.contextMenuId = 'g-ext-thread-context-menu';
+    this.contextMenuId = 'g-ext-thread-folder-menu';
     this.folders = [];
     this.enabled = true;
-    this.draggedThreadId = null;
-    this.originalThreadTitles = new Map();
   }
 
   async init() {
@@ -25,13 +23,12 @@ class SidebarFoldersModule {
       }
     });
 
-    window.addEventListener('g-ext-url-changed', () => {
-      setTimeout(() => this.reapplyFolderStylesAndTitles(), 500);
-    });
-
-    // 右クリック／移動メニュー外クリックでメニューを閉じる
-    document.addEventListener('click', () => {
-      this.closeThreadContextMenu();
+    // 画面外クリックでフォルダ選択メニューを閉じる
+    document.addEventListener('click', (e) => {
+      const menu = document.getElementById(this.contextMenuId);
+      if (menu && !menu.contains(e.target) && !e.target.closest('.g-ext-quick-folder-btn')) {
+        this.closeThreadContextMenu();
+      }
     });
   }
 
@@ -43,7 +40,7 @@ class SidebarFoldersModule {
 
     const existing = document.getElementById(this.containerId);
     if (existing) {
-      this.setupDraggableThreads();
+      this.attachQuickButtonsToThreads();
       return;
     }
 
@@ -98,8 +95,8 @@ class SidebarFoldersModule {
     });
 
     this.renderFolders();
-    this.setupDraggableThreads();
-    console.log('[Gemini Extended Suite] Sidebar Folders mounted');
+    this.attachQuickButtonsToThreads();
+    console.log('[Gemini Extended Suite] Stable Sidebar Folders mounted');
   }
 
   removeUI() {
@@ -129,10 +126,10 @@ class SidebarFoldersModule {
 
       header.innerHTML = `
         <span class="g-ext-folder-toggle-icon">▼</span>
-        <span style="font-size:14px;pointer-events:none;">${folder.icon || '📁'}</span>
-        <span class="g-ext-folder-name" title="${folder.name}" style="pointer-events:none;">${folder.name}</span>
-        <span class="g-ext-folder-count" style="pointer-events:none;">${(folder.threadIds || []).length}</span>
-        <button type="button" class="g-ext-folder-action-btn" title="フォルダ設定・一括リネーム" data-action="settings">⚙️</button>
+        <span style="font-size:14px;">${folder.icon || '📁'}</span>
+        <span class="g-ext-folder-name" title="${folder.name}">${folder.name}</span>
+        <span class="g-ext-folder-count">${(folder.threadIds || []).length}</span>
+        <button type="button" class="g-ext-folder-action-btn" title="フォルダ設定・編集" data-action="settings">⚙️</button>
       `;
 
       header.addEventListener('click', (e) => {
@@ -145,12 +142,10 @@ class SidebarFoldersModule {
         this.openFolderModal(folder);
       });
 
-      // ドロップゾーン登録
-      this.setupDropTarget(header, folder);
-
       const contents = document.createElement('div');
       contents.className = 'g-ext-folder-contents';
 
+      // フォルダ内スレッドの表示
       (folder.threadIds || []).forEach((tId) => {
         const item = document.createElement('div');
         item.className = 'g-ext-folder-thread-item';
@@ -163,9 +158,11 @@ class SidebarFoldersModule {
         item.style.alignItems = 'center';
         item.style.cursor = 'pointer';
 
-        const titleText = this.originalThreadTitles.get(tId) || `スレッド (${tId.slice(-6)})`;
+        // 公式DOMからスレッドのタイトルを探す（なければID略称）
+        const realTitle = this.findThreadTitleFromDOM(tId) || `スレッド (${tId.slice(-6)})`;
+
         item.innerHTML = `
-          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">📄 ${titleText}</span>
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${realTitle}">📄 ${realTitle}</span>
           <span style="opacity:0.5;padding:0 4px;" title="フォルダから除外">✕</span>
         `;
 
@@ -187,6 +184,15 @@ class SidebarFoldersModule {
     });
   }
 
+  findThreadTitleFromDOM(threadId) {
+    const link = document.querySelector(`a[href*="${threadId}"]`);
+    if (link) {
+      const titleSpan = link.querySelector('[class*="title"], [class*="text"], span') || link;
+      return titleSpan.textContent.trim();
+    }
+    return null;
+  }
+
   toggleFolderCollapse(folderId) {
     const f = this.folders.find(x => x.id === folderId);
     if (!f) return;
@@ -194,110 +200,43 @@ class SidebarFoldersModule {
     this.saveFolders();
   }
 
-  setupDropTarget(element, folder) {
-    element.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      e.dataTransfer.dropEffect = 'move';
-      element.classList.add('drag-over');
-    });
-
-    element.addEventListener('dragenter', (e) => {
-      e.preventDefault();
-      element.classList.add('drag-over');
-    });
-
-    element.addEventListener('dragleave', (e) => {
-      if (!element.contains(e.relatedTarget)) {
-        element.classList.remove('drag-over');
-      }
-    });
-
-    element.addEventListener('drop', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      element.classList.remove('drag-over');
-
-      const threadId = e.dataTransfer.getData('text/plain') || this.draggedThreadId;
-      console.log(`[Gemini Extended Suite] Dropped thread ${threadId} to folder ${folder.name}`);
-
-      if (threadId) {
-        this.assignThreadToFolder(folder.id, threadId);
-        this.draggedThreadId = null;
-      }
-    });
-  }
-
   /**
-   * 公式サイドバーのスレッド項目をD&D可能にし、右クリック/移動クイックボタンを注入
+   * 各スレッド行に「📁」クイック移動ボタンのみを確実に付与
    */
-  setupDraggableThreads() {
-    const threadElements = document.querySelectorAll(
-      'a[href*="/app/"], [data-test-id*="conversation"], side-nav-entry, [class*="conversation-item"]'
-    );
+  attachQuickButtonsToThreads() {
+    const threadLinks = document.querySelectorAll('a[href*="/app/"]');
 
-    threadElements.forEach((el) => {
-      const link = el.tagName === 'A' ? el : el.querySelector('a[href*="/app/"]');
-      if (!link) return;
-
+    threadLinks.forEach((link) => {
       const threadId = this.extractThreadId(link.href || link.getAttribute('href') || '');
       if (!threadId) return;
 
-      // 行要素（親またはlinkそのもの）
-      const rowItem = el;
+      // 行要素（linkまたは直近のラッパー）
+      const rowItem = link.closest('[class*="conversation"], [class*="item"], side-nav-entry') || link;
 
-      if (!rowItem.dataset.gExtDraggable) {
-        rowItem.dataset.gExtDraggable = 'true';
-        rowItem.setAttribute('draggable', 'true');
+      if (!rowItem.querySelector('.g-ext-quick-folder-btn')) {
+        const quickBtn = document.createElement('button');
+        quickBtn.type = 'button';
+        quickBtn.className = 'g-ext-quick-folder-btn';
+        quickBtn.innerHTML = '📁';
+        quickBtn.title = 'このスレッドをフォルダへ振り分け';
 
-        // キャッシュ
-        const titleSpan = rowItem.querySelector('[class*="title"], [class*="text"], span') || rowItem;
-        if (titleSpan.textContent) {
-          this.originalThreadTitles.set(threadId, titleSpan.textContent.trim());
-        }
-
-        // ドラッグ開始
-        rowItem.addEventListener('dragstart', (e) => {
-          this.draggedThreadId = threadId;
-          e.dataTransfer.setData('text/plain', threadId);
-          e.dataTransfer.effectAllowed = 'move';
-          rowItem.classList.add('g-ext-thread-dragging');
+        quickBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.showThreadFolderPicker(quickBtn, threadId);
         });
 
-        rowItem.addEventListener('dragend', () => {
-          rowItem.classList.remove('g-ext-thread-dragging');
-          this.draggedThreadId = null;
-        });
-
-        // 確実な代替手段: スレッド横に「📁」クイック振り分けボタンを追加
-        if (!rowItem.querySelector('.g-ext-quick-folder-btn')) {
-          const quickBtn = document.createElement('button');
-          quickBtn.type = 'button';
-          quickBtn.className = 'g-ext-quick-folder-btn';
-          quickBtn.innerHTML = '📁';
-          quickBtn.title = 'このスレッドをフォルダに移動';
-          quickBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.showThreadFolderPicker(quickBtn, threadId);
-          });
-
-          // 行の末尾に挿入
-          rowItem.style.position = 'relative';
-          rowItem.appendChild(quickBtn);
-        }
+        rowItem.style.position = 'relative';
+        rowItem.appendChild(quickBtn);
       }
     });
   }
 
-  /**
-   * D&Dに依存しない「📁 フォルダへ移動」クイックピッカー
-   */
   showThreadFolderPicker(anchorEl, threadId) {
     this.closeThreadContextMenu();
 
     if (this.folders.length === 0) {
-      alert('先に「+ 新規フォルダ」からフォルダを作成してください。');
+      alert('先に左サイドバー上部の「+ 新規フォルダ」からフォルダを作成してください。');
       return;
     }
 
@@ -307,19 +246,26 @@ class SidebarFoldersModule {
 
     menu.innerHTML = `
       <div style="font-size:11px;font-weight:700;color:var(--g-ext-text-muted);padding:4px 8px;border-bottom:1px solid var(--g-ext-border);">
-        移動先フォルダを選択:
+        振り分け先フォルダ:
       </div>
     `;
 
     this.folders.forEach(f => {
+      const isAlreadyIn = (f.threadIds || []).includes(threadId);
       const opt = document.createElement('div');
       opt.className = 'g-ext-folder-menu-item';
-      opt.innerHTML = `<span>${f.icon || '📁'}</span><span>${f.name}</span>`;
+      opt.innerHTML = `
+        <span>${f.icon || '📁'}</span>
+        <span style="flex:1;">${f.name}</span>
+        ${isAlreadyIn ? `<span style="font-size:10px;color:var(--g-ext-success);">✓ 登録済</span>` : ''}
+      `;
+
       opt.addEventListener('click', (e) => {
         e.stopPropagation();
         this.assignThreadToFolder(f.id, threadId);
         this.closeThreadContextMenu();
       });
+
       menu.appendChild(opt);
     });
 
@@ -372,6 +318,9 @@ class SidebarFoldersModule {
     this.renderFolders();
   }
 
+  /**
+   * シンプルなフォルダ作成・編集モーダル（リネーム機能撤去）
+   */
   openFolderModal(targetFolder = null) {
     const isEdit = !!targetFolder;
     const folder = isEdit ? { ...targetFolder } : {
@@ -387,9 +336,9 @@ class SidebarFoldersModule {
     modalBackdrop.className = 'g-ext-modal-backdrop';
 
     modalBackdrop.innerHTML = `
-      <div class="g-ext-modal">
+      <div class="g-ext-modal" style="max-width:380px;">
         <div class="g-ext-modal-header">
-          <span class="g-ext-modal-title">${isEdit ? '📁 フォルダ設定 ＆ 一括リネーム' : '📁 新規フォルダ作成'}</span>
+          <span class="g-ext-modal-title">${isEdit ? '📁 フォルダ設定' : '📁 新規フォルダ作成'}</span>
           <button type="button" class="g-ext-modal-close">✕</button>
         </div>
 
@@ -409,42 +358,6 @@ class SidebarFoldersModule {
           </div>
         </div>
 
-        ${isEdit ? `
-        <div style="border-top:1px solid var(--g-ext-border);padding-top:12px;">
-          <span class="g-ext-modal-label" style="display:block;margin-bottom:6px;color:var(--g-ext-primary);font-weight:700;">
-            ✨ ハイブリッド一括リネーム（タグ/絵文字挿入）
-          </span>
-          <div style="font-size:12px;color:var(--g-ext-text-muted);margin-bottom:8px;">
-            プレフィックス（例: [${folder.icon || '📁'} ${folder.name || 'タグ'}]）をフォルダ内のスレッド名に付与します。
-          </div>
-
-          <div class="g-ext-modal-field">
-            <label class="g-ext-modal-label">付与する接頭辞（プレフィックス）</label>
-            <input type="text" id="g-ext-rename-prefix-input" class="g-ext-input" value="[${folder.icon} ${folder.name}] ">
-          </div>
-
-          <div class="g-ext-modal-field">
-            <label class="g-ext-modal-label">対象スレッド一覧（個別除外チェック）</label>
-            <div class="g-ext-thread-checklist" id="g-ext-rename-thread-list"></div>
-          </div>
-
-          <label class="g-ext-checkbox-item" style="margin-top:8px;">
-            <input type="checkbox" id="g-ext-sync-official-checkbox">
-            <span>Gemini公式サーバー側タイトルも更新する（400msディレイ順次同期）</span>
-          </label>
-
-          <div id="g-ext-progress-section" style="display:none;margin-top:8px;">
-            <div style="font-size:12px;font-weight:600;display:flex;justify-content:space-between;">
-              <span id="g-ext-progress-status">処理中: 0/0</span>
-              <span id="g-ext-progress-percent">0%</span>
-            </div>
-            <div class="g-ext-progress-bar-wrap">
-              <div class="g-ext-progress-bar-inner" id="g-ext-progress-bar"></div>
-            </div>
-          </div>
-        </div>
-        ` : ''}
-
         <div class="g-ext-modal-actions">
           ${isEdit ? `<button type="button" class="g-ext-btn g-ext-btn-secondary" id="g-ext-btn-delete-folder" style="color:var(--g-ext-danger);margin-right:auto;">削除</button>` : ''}
           <button type="button" class="g-ext-btn g-ext-btn-secondary" id="g-ext-modal-cancel">キャンセル</button>
@@ -455,31 +368,13 @@ class SidebarFoldersModule {
 
     document.body.appendChild(modalBackdrop);
 
-    if (isEdit) {
-      const listContainer = modalBackdrop.querySelector('#g-ext-rename-thread-list');
-      if (folder.threadIds && folder.threadIds.length > 0) {
-        folder.threadIds.forEach(tId => {
-          const title = this.originalThreadTitles.get(tId) || `スレッド (${tId})`;
-          const row = document.createElement('label');
-          row.className = 'g-ext-checkbox-item';
-          row.innerHTML = `
-            <input type="checkbox" checked value="${tId}" class="g-ext-rename-target-cb">
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${title}</span>
-          `;
-          listContainer.appendChild(row);
-        });
-      } else {
-        listContainer.innerHTML = `<span style="font-size:11px;color:var(--g-ext-text-muted);">スレッドが登録されていません</span>`;
-      }
-    }
-
     const close = () => modalBackdrop.remove();
     modalBackdrop.querySelector('.g-ext-modal-close').addEventListener('click', close);
     modalBackdrop.querySelector('#g-ext-modal-cancel').addEventListener('click', close);
 
     if (isEdit) {
       modalBackdrop.querySelector('#g-ext-btn-delete-folder').addEventListener('click', async () => {
-        if (confirm(`フォルダ「${folder.name}」を削除してもよろしいですか？（スレッドは保持されます）`)) {
+        if (confirm(`フォルダ「${folder.name}」を削除してもよろしいですか？（スレッド自体は削除されません）`)) {
           this.folders = this.folders.filter(f => f.id !== folder.id);
           await this.saveFolders();
           close();
@@ -504,103 +399,13 @@ class SidebarFoldersModule {
       if (isEdit) {
         const index = this.folders.findIndex(f => f.id === folder.id);
         if (index !== -1) this.folders[index] = folder;
-
-        const prefixInput = modalBackdrop.querySelector('#g-ext-rename-prefix-input')?.value;
-        const syncOfficial = modalBackdrop.querySelector('#g-ext-sync-official-checkbox')?.checked;
-        const checkedBoxes = Array.from(modalBackdrop.querySelectorAll('.g-ext-rename-target-cb:checked'));
-        const targetIds = checkedBoxes.map(cb => cb.value);
-
-        if (prefixInput && targetIds.length > 0) {
-          await this.executeHybridRename(modalBackdrop, targetIds, prefixInput, syncOfficial);
-        }
       } else {
         this.folders.push(folder);
       }
 
       await this.saveFolders();
-      if (!isEdit || !modalBackdrop.querySelector('#g-ext-sync-official-checkbox')?.checked) {
-        close();
-      }
+      close();
     });
-  }
-
-  async executeHybridRename(modal, targetThreadIds, prefix, syncOfficial) {
-    targetThreadIds.forEach(threadId => {
-      const currentTitle = this.originalThreadTitles.get(threadId) || '会話スレッド';
-      const newTitle = currentTitle.startsWith(prefix) ? currentTitle : `${prefix}${currentTitle}`;
-      this.originalThreadTitles.set(threadId, newTitle);
-
-      const links = document.querySelectorAll(`a[href*="${threadId}"]`);
-      links.forEach(link => {
-        const titleEl = link.querySelector('[class*="title"], [class*="text"]') || link;
-        if (titleEl) titleEl.textContent = newTitle;
-      });
-    });
-
-    if (!syncOfficial) return;
-
-    const progressSection = modal.querySelector('#g-ext-progress-section');
-    const statusText = modal.querySelector('#g-ext-progress-status');
-    const percentText = modal.querySelector('#g-ext-progress-percent');
-    const progressBar = modal.querySelector('#g-ext-progress-bar');
-    const saveBtn = modal.querySelector('#g-ext-modal-save');
-
-    if (progressSection) progressSection.style.display = 'block';
-    if (saveBtn) saveBtn.disabled = true;
-
-    const total = targetThreadIds.length;
-    for (let i = 0; i < total; i++) {
-      const threadId = targetThreadIds[i];
-      const newTitle = this.originalThreadTitles.get(threadId);
-
-      const currentIdx = i + 1;
-      const pct = Math.round((currentIdx / total) * 100);
-      if (statusText) statusText.textContent = `処理中: ${currentIdx}/${total}`;
-      if (percentText) percentText.textContent = `${pct}%`;
-      if (progressBar) progressBar.style.width = `${pct}%`;
-
-      await this.simulateOfficialRename(threadId, newTitle);
-      await new Promise(r => setTimeout(r, 400));
-    }
-
-    if (statusText) statusText.textContent = `完了: ${total}/${total}`;
-    await new Promise(r => setTimeout(r, 500));
-    modal.remove();
-  }
-
-  async simulateOfficialRename(threadId, newTitle) {
-    const threadLink = document.querySelector(`a[href*="${threadId}"]`);
-    if (!threadLink) return;
-
-    const menuBtn = threadLink.parentElement?.querySelector('button[aria-haspopup="menu"], button[aria-label*="メニュー"], button[aria-label*="オプション"]');
-    if (!menuBtn) return;
-
-    try {
-      menuBtn.click();
-      await new Promise(r => setTimeout(r, 100));
-
-      const menuItems = Array.from(document.querySelectorAll('[role="menuitem"], [role="option"], mat-option'));
-      const renameItem = menuItems.find(item => (item.textContent || '').includes('名前を変更') || (item.textContent || '').includes('リネーム') || (item.textContent || '').includes('Rename'));
-
-      if (renameItem) {
-        renameItem.click();
-        await new Promise(r => setTimeout(r, 100));
-
-        const input = document.querySelector('input[type="text"]:focus, mat-dialog input, [role="dialog"] input');
-        if (input) {
-          input.value = newTitle;
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
-        }
-      }
-    } catch (e) {
-      console.warn(`[Gemini Extended Suite] Official rename simulation skipped:`, e);
-    }
-  }
-
-  reapplyFolderStylesAndTitles() {
-    this.renderFolders();
-    this.setupDraggableThreads();
   }
 }
 

@@ -1,6 +1,6 @@
 /**
  * Gemini Extended Suite - popup.js
- * ポップアップ設定管理、公式スキル管理、バックアップ入出力
+ * ポップアップ設定管理、バックアップ入出力
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -22,7 +22,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 2. 機能トグルのバインディング
   const toggles = [
     { id: 'toggle-model-switcher', key: 'enableModelSwitcher' },
-    { id: 'toggle-skill-launcher', key: 'enableSkillLauncher' },
     { id: 'toggle-sidebar-folders', key: 'enableSidebarFolders' },
     { id: 'toggle-markdown-export', key: 'enableMarkdownExport' },
     { id: 'toggle-usage-monitor', key: 'enableUsageMonitor' },
@@ -48,67 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // 3. 公式スキル管理 (geminiOfficialSkills)
-  let skills = (await chrome.storage.local.get('geminiOfficialSkills')).geminiOfficialSkills || [];
-  const skillListEl = document.getElementById('popup-skill-list');
-
-  function renderSkills() {
-    if (!skillListEl) return;
-    skillListEl.innerHTML = '';
-
-    if (skills.length === 0) {
-      skillListEl.innerHTML = '<div style="font-size:11px;color:#94a3b8;padding:8px;">登録された公式スキルがありません</div>';
-      return;
-    }
-
-    skills.forEach((s, idx) => {
-      const card = document.createElement('div');
-      card.className = 'skill-card';
-      card.innerHTML = `
-        <div class="skill-card-info">
-          <div class="skill-card-name">${s.icon || '⚡'} @${s.name}</div>
-          <div class="skill-card-cmd" style="color:var(--g-ext-text-muted);">${s.desc || 'Gemini公式スキル'}</div>
-        </div>
-        <button type="button" class="btn btn-sm btn-secondary" style="color:#ef4444;" data-del="${idx}">削除</button>
-      `;
-
-      card.querySelector('[data-del]').addEventListener('click', async () => {
-        skills.splice(idx, 1);
-        await chrome.storage.local.set({ geminiOfficialSkills: skills });
-        renderSkills();
-      });
-
-      skillListEl.appendChild(card);
-    });
-  }
-
-  renderSkills();
-
-  // 公式設定ページを開く
-  document.getElementById('btn-open-skills-page')?.addEventListener('click', () => {
-    chrome.tabs.create({ url: 'https://gemini.google.com/customize/skills' });
-  });
-
-  // スキル手動追加
-  document.getElementById('btn-add-skill')?.addEventListener('click', async () => {
-    const name = prompt('呼び出したい公式スキル名を入力してください (例: ディープリサーチ)');
-    if (!name) return;
-    const cleanName = name.replace(/^@/, '').trim();
-    const desc = prompt('説明（任意）') || '';
-
-    const newSkill = {
-      id: `skill-${Date.now()}`,
-      name: cleanName,
-      icon: '⚡',
-      desc: desc
-    };
-
-    skills.push(newSkill);
-    await chrome.storage.local.set({ geminiOfficialSkills: skills });
-    renderSkills();
-  });
-
-  // 4. バックアップ（エクスポート & インポート）
+  // 3. バックアップ（エクスポート & インポート）
   document.getElementById('btn-export-backup')?.addEventListener('click', async () => {
     const allData = await chrome.storage.local.get(null);
     const jsonStr = JSON.stringify(allData, null, 2);
