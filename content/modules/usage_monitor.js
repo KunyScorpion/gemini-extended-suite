@@ -1,13 +1,13 @@
 /**
  * Gemini Extended Suite - Feature 5: 使用量・クォータ常時インジケーター
- * 画面右上にコンパクト配置、ゲージ/パーセンテージ表示、残量警告色変化、詳細ポップオーバー
+ * メインチャット画面（/app）での確実な常時表示（右上ツールバーまたはフローティング）
  */
 
 class UsageMonitorModule {
   constructor() {
     this.containerId = 'g-ext-usage-indicator-root';
     this.enabled = true;
-    this.dailyLimit = 100; // 1日の想定上限またはクォータ
+    this.dailyLimit = 100;
     this.todayRequests = 0;
     this.isPopoverOpen = false;
   }
@@ -21,7 +21,6 @@ class UsageMonitorModule {
     const stats = data.usageStats || {};
     this.todayRequests = stats[todayKey] || 0;
 
-    // リクエスト送信検知リスナー
     this.setupRequestDetection();
   }
 
@@ -37,29 +36,62 @@ class UsageMonitorModule {
       return;
     }
 
+    // 1. ヘッダーまたはトップバーを探索
     const header = this.findHeaderRightAnchor();
-    if (!header) return;
+    if (header) {
+      this.mountUI(header);
+      return;
+    }
 
-    this.mountUI(header);
+    // 2. チャット画面（/app/*）のフォールバック: 右上フローティングバー
+    this.mountFloatingFallback();
   }
 
   findHeaderRightAnchor() {
     const selectors = [
-      'header [class*="trailing"]',
+      'header [class*="trailing-actions"]',
       'header [class*="actions"]',
+      'header [class*="tools"]',
       'header',
+      '[role="banner"] [class*="actions"]',
+      '[role="banner"]',
+      'app-header',
+      'mat-toolbar',
       '.top-bar-container',
+      '.chat-header',
       '[data-test-id*="header"]'
     ];
 
     for (const sel of selectors) {
       const el = document.querySelector(sel);
-      if (el) return el;
+      if (el && el.offsetHeight > 0) return el;
     }
     return null;
   }
 
   mountUI(header) {
+    const wrap = this.createIndicatorElement();
+    header.appendChild(wrap);
+    this.updateUI();
+    console.log('[Gemini Extended Suite] Usage Monitor mounted in header');
+  }
+
+  mountFloatingFallback() {
+    let utilBar = document.getElementById('g-ext-top-floating-bar');
+    if (!utilBar) {
+      utilBar = document.createElement('div');
+      utilBar.id = 'g-ext-top-floating-bar';
+      utilBar.className = 'g-ext-top-floating-bar';
+      document.body.appendChild(utilBar);
+    }
+
+    const wrap = this.createIndicatorElement();
+    utilBar.appendChild(wrap);
+    this.updateUI();
+    console.log('[Gemini Extended Suite] Usage Monitor mounted in floating bar');
+  }
+
+  createIndicatorElement() {
     const wrap = document.createElement('div');
     wrap.id = this.containerId;
     wrap.className = 'g-ext-usage-indicator';
@@ -98,9 +130,7 @@ class UsageMonitorModule {
       }
     });
 
-    header.appendChild(wrap);
-    this.updateUI();
-    console.log('[Gemini Extended Suite] Usage Monitor mounted');
+    return wrap;
   }
 
   removeUI() {
@@ -150,9 +180,6 @@ class UsageMonitorModule {
     }
   }
 
-  /**
-   * チャット送信ボタンのクリックや Enter 送信を検知してリクエスト数をインクリメント
-   */
   setupRequestDetection() {
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {

@@ -3,12 +3,10 @@
  * 通知、ストレージ初期化、バックグラウンド連携を管理
  */
 
-// インストール時のデフォルト設定初期化
 chrome.runtime.onInstalled.addListener(async (details) => {
   console.log('[Gemini Extended Suite] Extension installed / updated:', details.reason);
 
   const defaultSettings = {
-    // 機能有効・無効フラグ
     enableModelSwitcher: true,
     enableSkillLauncher: true,
     enableSidebarFolders: true,
@@ -16,52 +14,20 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     enableUsageMonitor: true,
     enableChatEnhancer: true,
     
-    // チャット快適化オプション
     fullWidthMode: false,
     enableCharCount: true,
     enableDesktopNotifications: true,
     enableTableOfContents: true,
 
-    // MDエクスポート設定
     exportIncludeThinking: true,
+    selectedModel: 'flash-38',
 
-    // デフォルト登録スキルリスト（2026年Post-Gemアーキテクチャ対応）
-    skills: [
-      {
-        id: 'skill-research',
-        name: 'ディープリサーチ',
-        icon: '🔍',
-        command: '/skill:research ',
-        description: '信頼性の高い学術論文・公式ソースを横断調査し論理的にまとめます'
-      },
-      {
-        id: 'skill-plot',
-        name: '創作プロット設計',
-        icon: '📖',
-        command: '/skill:story-plot ',
-        description: '三幕構成とキャラクター動線に基づいた長編小説・シナリオの骨子を作成'
-      },
-      {
-        id: 'skill-code',
-        name: 'コードレビュー＆リファクタ',
-        icon: '💻',
-        command: '/skill:code-review ',
-        description: 'セキュリティ脆弱性・パフォーマンス・可読性を多角的に検証'
-      },
-      {
-        id: 'skill-summary',
-        name: '超要約・重要論点抽出',
-        icon: '⚡',
-        command: '/skill:executive-summary ',
-        description: '長文を箇条書き3点と要約、Next Actionに即時整理'
-      },
-      {
-        id: 'skill-translate',
-        name: '文脈適合翻訳（日英）',
-        icon: '🌐',
-        command: '/skill:context-translate ',
-        description: '自然なニュアンスと業界用語を保った高精度バイリンガル翻訳'
-      }
+    // 2026/10 Gemini公式スキル初期候補
+    geminiOfficialSkills: [
+      { id: 's-1', name: 'ディープリサーチ', icon: '🔍', desc: 'Web上の学術・公式ソースを横断調査' },
+      { id: 's-2', name: '長編小説・シナリオ創作', icon: '📖', desc: 'プロット構成とキャラクター描写' },
+      { id: 's-3', name: 'コードレビュー＆最適化', icon: '💻', desc: 'バグ検出・リファクタリング提案' },
+      { id: 's-4', name: 'エグゼクティブ要約', icon: '⚡', desc: '長文・資料の要点箇条書き' }
     ],
 
     // フォルダ管理データ
@@ -100,7 +66,6 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   }
 });
 
-// メッセージリスナー
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'SHOW_NOTIFICATION') {
     const { title, body, iconUrl } = message.payload;
@@ -115,7 +80,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: true, notificationId });
     });
 
-    return true; // 非同期レスポンス維持
+    return true;
   }
 
   if (message.type === 'GET_EXTENSION_INFO') {

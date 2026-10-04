@@ -12,14 +12,14 @@
       <img src="../icons/icon-48.png" alt="Icon" class="brand-icon">
       <div>
         <div class="brand-title">Gemini Extended Suite</div>
-        <div class="brand-sub">Post-2026/10 Architecture v1.0.0</div>
+        <div class="brand-sub">Post-2026/10 Architecture v1.1.0</div>
       </div>
     </div>
   </header>
 
   <nav class="popup-tabs">
     <button type="button" class="tab-btn active" data-tab="features">機能設定</button>
-    <button type="button" class="tab-btn" data-tab="skills">スキル管理</button>
+    <button type="button" class="tab-btn" data-tab="skills">公式スキル</button>
     <button type="button" class="tab-btn" data-tab="backup">バックアップ</button>
     <button type="button" class="tab-btn" data-tab="shortcuts">ヘルプ</button>
   </nav>
@@ -36,7 +36,7 @@
       </label>
 
       <label class="toggle-row">
-        <span>⚡ スキル / タスク ランチャー</span>
+        <span>⚡ 公式スキル (@Skills) ランチャー</span>
         <input type="checkbox" id="toggle-skill-launcher" checked>
         <span class="switch"></span>
       </label>
@@ -89,15 +89,19 @@
     </section>
   </main>
 
-  <!-- タブ 2: スキル管理 -->
+  <!-- タブ 2: 公式スキル管理 -->
   <main class="tab-content" id="tab-skills">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <span style="font-size:12px;font-weight:700;">登録済みスキル一覧</span>
-      <button type="button" class="btn btn-sm btn-primary" id="btn-add-skill">+ 追加</button>
+      <span style="font-size:12px;font-weight:700;">登録済み公式スキル (@Skills)</span>
+      <div style="display:flex;gap:4px;">
+        <button type="button" class="btn btn-sm btn-secondary" id="btn-open-skills-page">公式設定を開く ↗</button>
+        <button type="button" class="btn btn-sm btn-primary" id="btn-add-skill">+ 登録</button>
+      </div>
     </div>
-    <div class="skill-list" id="popup-skill-list">
-      <!-- JSで動的生成 -->
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">
+      チャット画面の「⚡ スキル」ボタンからワンクリックで @メンション呼び出しできます。
     </div>
+    <div class="skill-list" id="popup-skill-list"></div>
   </main>
 
   <!-- タブ 3: バックアップ -->
@@ -105,7 +109,7 @@
     <div class="setting-group">
       <div class="group-title">フォルダ・設定データの保存</div>
       <p style="font-size:11px;color:#94a3b8;margin-bottom:12px;">
-        作成したフォルダ構造や登録スキルをJSONファイルとして書き出し・読み込みできます。
+        作成したフォルダ構造や公式スキルキャッシュをJSONファイルとして書き出し・読み込みできます。
       </p>
       <div style="display:flex;gap:8px;">
         <button type="button" class="btn btn-primary" style="flex:1;" id="btn-export-backup">JSONエクスポート</button>
@@ -120,20 +124,20 @@
   <main class="tab-content" id="tab-shortcuts">
     <div class="shortcut-list">
       <div class="shortcut-item">
-        <span class="shortcut-key">/</span>
-        <span class="shortcut-desc">入力欄でスキル選択ポップアップ表示</span>
+        <span class="shortcut-key">⚡ MODEL</span>
+        <span class="shortcut-desc">入力欄直上のピルで 3.8 Flash / 3.1 Pro / 4 Argon を即時切替</span>
       </div>
       <div class="shortcut-item">
-        <span class="shortcut-key">↑ / ↓</span>
-        <span class="shortcut-desc">スキル候補リストの移動</span>
+        <span class="shortcut-key">⚡ スキル</span>
+        <span class="shortcut-desc">ワンクリックで公式スキルを @メンション呼び出し</span>
       </div>
       <div class="shortcut-item">
-        <span class="shortcut-key">Enter</span>
-        <span class="shortcut-desc">選択スキルの即時挿入</span>
+        <span class="shortcut-key">📁 D&D / 📁</span>
+        <span class="shortcut-desc">スレッドのD&Dまたはホバー時の📁アイコンでフォルダ移動</span>
       </div>
       <div class="shortcut-item">
-        <span class="shortcut-key">D&D</span>
-        <span class="shortcut-desc">スレッドをフォルダへドラッグ＆ドロップ分類</span>
+        <span class="shortcut-key">📥 MD保存</span>
+        <span class="shortcut-desc">画面右上ユーティリティバーからワンクリック出力</span>
       </div>
     </div>
   </main>

@@ -1,6 +1,6 @@
 /**
  * Gemini Extended Suite - popup.js
- * ポップアップ設定管理、スキル編集、バックアップ入出力
+ * ポップアップ設定管理、公式スキル管理、バックアップ入出力
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -48,8 +48,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // 3. スキル管理
-  let skills = (await chrome.storage.local.get('skills')).skills || [];
+  // 3. 公式スキル管理 (geminiOfficialSkills)
+  let skills = (await chrome.storage.local.get('geminiOfficialSkills')).geminiOfficialSkills || [];
   const skillListEl = document.getElementById('popup-skill-list');
 
   function renderSkills() {
@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     skillListEl.innerHTML = '';
 
     if (skills.length === 0) {
-      skillListEl.innerHTML = '<div style="font-size:11px;color:#94a3b8;padding:8px;">登録されたスキルがありません</div>';
+      skillListEl.innerHTML = '<div style="font-size:11px;color:#94a3b8;padding:8px;">登録された公式スキルがありません</div>';
       return;
     }
 
@@ -66,15 +66,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       card.className = 'skill-card';
       card.innerHTML = `
         <div class="skill-card-info">
-          <div class="skill-card-name">${s.icon || '⚡'} ${s.name}</div>
-          <div class="skill-card-cmd">${s.command}</div>
+          <div class="skill-card-name">${s.icon || '⚡'} @${s.name}</div>
+          <div class="skill-card-cmd" style="color:var(--g-ext-text-muted);">${s.desc || 'Gemini公式スキル'}</div>
         </div>
         <button type="button" class="btn btn-sm btn-secondary" style="color:#ef4444;" data-del="${idx}">削除</button>
       `;
 
       card.querySelector('[data-del]').addEventListener('click', async () => {
         skills.splice(idx, 1);
-        await chrome.storage.local.set({ skills });
+        await chrome.storage.local.set({ geminiOfficialSkills: skills });
         renderSkills();
       });
 
@@ -84,23 +84,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   renderSkills();
 
-  // スキル追加ボタン
+  // 公式設定ページを開く
+  document.getElementById('btn-open-skills-page')?.addEventListener('click', () => {
+    chrome.tabs.create({ url: 'https://gemini.google.com/customize/skills' });
+  });
+
+  // スキル手動追加
   document.getElementById('btn-add-skill')?.addEventListener('click', async () => {
-    const name = prompt('スキル名を入力してください (例: 要約アシスタント)');
+    const name = prompt('呼び出したい公式スキル名を入力してください (例: ディープリサーチ)');
     if (!name) return;
-    const command = prompt('呼び出しコマンドを入力してください (例: /skill:summary )', `/skill:${name.toLowerCase().replace(/\s+/g, '-')} `);
-    if (!command) return;
+    const cleanName = name.replace(/^@/, '').trim();
+    const desc = prompt('説明（任意）') || '';
 
     const newSkill = {
       id: `skill-${Date.now()}`,
-      name,
+      name: cleanName,
       icon: '⚡',
-      command,
-      description: ''
+      desc: desc
     };
 
     skills.push(newSkill);
-    await chrome.storage.local.set({ skills });
+    await chrome.storage.local.set({ geminiOfficialSkills: skills });
     renderSkills();
   });
 

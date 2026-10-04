@@ -1,15 +1,16 @@
 /**
  * Gemini Extended Suite - Feature 3: サイドバーのフォルダ管理 ＆ ハイブリッド一括リネーム
- * 左サイドバーにフォルダ構造を追加、D&D整理、タグ・絵文字一括整形（ローカル即時 ＋ サーバー同期）
+ * D&Dの確実なイベント伝播 ＋ ワンクリック「フォルダへ移動」メニュー搭載
  */
 
 class SidebarFoldersModule {
   constructor() {
     this.containerId = 'g-ext-sidebar-folder-root';
+    this.contextMenuId = 'g-ext-thread-context-menu';
     this.folders = [];
     this.enabled = true;
-    this.draggedThread = null;
-    this.originalThreadTitles = new Map(); // スレッドID -> 元のタイトル
+    this.draggedThreadId = null;
+    this.originalThreadTitles = new Map();
   }
 
   async init() {
@@ -17,7 +18,6 @@ class SidebarFoldersModule {
     this.enabled = data.enableSidebarFolders !== false;
     this.folders = data.folders || [];
 
-    // ストレージ変更監視
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'local' && changes.folders) {
         this.folders = changes.folders.newValue || [];
@@ -25,9 +25,13 @@ class SidebarFoldersModule {
       }
     });
 
-    // SPA遷移時のタイトル再適用監視
     window.addEventListener('g-ext-url-changed', () => {
       setTimeout(() => this.reapplyFolderStylesAndTitles(), 500);
+    });
+
+    // 右クリック／移動メニュー外クリックでメニューを閉じる
+    document.addEventListener('click', () => {
+      this.closeThreadContextMenu();
     });
   }
 
@@ -50,7 +54,6 @@ class SidebarFoldersModule {
   }
 
   findSidebarHistoryContainer() {
-    // 2026/Post-Gemini サイドバーのチャット履歴一覧の親セレクタ
     const selectors = [
       'nav[aria-label*="チャット"], nav[aria-label*="履歴"], nav[aria-label*="Conversations"]',
       '.conversation-container',
@@ -58,7 +61,8 @@ class SidebarFoldersModule {
       'side-nav',
       'mat-nav-list',
       'nav',
-      'aside'
+      'aside',
+      '[role="navigation"]'
     ];
 
     for (const sel of selectors) {
@@ -87,7 +91,6 @@ class SidebarFoldersModule {
     section.appendChild(header);
     section.appendChild(folderList);
 
-    // サイドバーの先頭（チャット一覧の上部）に挿入
     sidebar.insertBefore(section, sidebar.firstChild);
 
     header.querySelector('#g-ext-btn-new-folder').addEventListener('click', () => {
@@ -111,7 +114,7 @@ class SidebarFoldersModule {
     listBody.innerHTML = '';
 
     if (this.folders.length === 0) {
-      listBody.innerHTML = `<div style="font-size:11px;color:var(--g-ext-text-muted);padding:4px;">フォルダがありません</div>`;
+      listBody.innerHTML = `<div style="font-size:11px;color:var(--g-ext-text-muted);padding:4px;">「+ 新規フォルダ」で作成</div>`;
       return;
     }
 
@@ -126,36 +129,34 @@ class SidebarFoldersModule {
 
       header.innerHTML = `
         <span class="g-ext-folder-toggle-icon">▼</span>
-        <span style="font-size:14px;">${folder.icon || '📁'}</span>
-        <span class="g-ext-folder-name" title="${folder.name}">${folder.name}</span>
-        <span class="g-ext-folder-count">${(folder.threadIds || []).length}</span>
+        <span style="font-size:14px;pointer-events:none;">${folder.icon || '📁'}</span>
+        <span class="g-ext-folder-name" title="${folder.name}" style="pointer-events:none;">${folder.name}</span>
+        <span class="g-ext-folder-count" style="pointer-events:none;">${(folder.threadIds || []).length}</span>
         <button type="button" class="g-ext-folder-action-btn" title="フォルダ設定・一括リネーム" data-action="settings">⚙️</button>
       `;
 
-      // フォルダクリックで折りたたみ
       header.addEventListener('click', (e) => {
         if (e.target.closest('.g-ext-folder-action-btn')) return;
         this.toggleFolderCollapse(folder.id);
       });
 
-      // 設定・一括リネームボタン
       header.querySelector('[data-action="settings"]').addEventListener('click', (e) => {
         e.stopPropagation();
         this.openFolderModal(folder);
       });
 
-      // ドラッグ＆ドロップ受領（スレッドの振り分け）
+      // ドロップゾーン登録
       this.setupDropTarget(header, folder);
 
       const contents = document.createElement('div');
       contents.className = 'g-ext-folder-contents';
 
-      // フォルダ所属スレッドアイテムの描画
       (folder.threadIds || []).forEach((tId) => {
         const item = document.createElement('div');
         item.className = 'g-ext-folder-thread-item';
         item.style.fontSize = '12px';
-        item.style.padding = '3px 6px';
+        item.style.padding = '4px 6px';
+        item.style.borderRadius = '4px';
         item.style.color = 'var(--g-ext-text-muted)';
         item.style.display = 'flex';
         item.style.justifyContent = 'space-between';
@@ -165,7 +166,7 @@ class SidebarFoldersModule {
         const titleText = this.originalThreadTitles.get(tId) || `スレッド (${tId.slice(-6)})`;
         item.innerHTML = `
           <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">📄 ${titleText}</span>
-          <span style="opacity:0.4;cursor:pointer;" title="フォルダから解除">✕</span>
+          <span style="opacity:0.5;padding:0 4px;" title="フォルダから除外">✕</span>
         `;
 
         item.querySelector('span:first-child').addEventListener('click', () => {
@@ -196,56 +197,144 @@ class SidebarFoldersModule {
   setupDropTarget(element, folder) {
     element.addEventListener('dragover', (e) => {
       e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'move';
       element.classList.add('drag-over');
     });
 
-    element.addEventListener('dragleave', () => {
-      element.classList.remove('drag-over');
+    element.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      element.classList.add('drag-over');
+    });
+
+    element.addEventListener('dragleave', (e) => {
+      if (!element.contains(e.relatedTarget)) {
+        element.classList.remove('drag-over');
+      }
     });
 
     element.addEventListener('drop', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       element.classList.remove('drag-over');
-      if (this.draggedThread) {
-        this.assignThreadToFolder(folder.id, this.draggedThread);
-        this.draggedThread = null;
+
+      const threadId = e.dataTransfer.getData('text/plain') || this.draggedThreadId;
+      console.log(`[Gemini Extended Suite] Dropped thread ${threadId} to folder ${folder.name}`);
+
+      if (threadId) {
+        this.assignThreadToFolder(folder.id, threadId);
+        this.draggedThreadId = null;
       }
     });
   }
 
   /**
-   * 公式サイドバー内のスレッドリンクをドラッグ可能にする
+   * 公式サイドバーのスレッド項目をD&D可能にし、右クリック/移動クイックボタンを注入
    */
   setupDraggableThreads() {
-    const threadElements = document.querySelectorAll('a[href*="/app/"], [data-test-id*="conversation"]');
+    const threadElements = document.querySelectorAll(
+      'a[href*="/app/"], [data-test-id*="conversation"], side-nav-entry, [class*="conversation-item"]'
+    );
+
     threadElements.forEach((el) => {
-      if (el.dataset.gExtDraggable) return;
-      el.dataset.gExtDraggable = 'true';
-      el.draggable = true;
+      const link = el.tagName === 'A' ? el : el.querySelector('a[href*="/app/"]');
+      if (!link) return;
 
-      const threadId = this.extractThreadId(el.href || el.getAttribute('href') || '');
+      const threadId = this.extractThreadId(link.href || link.getAttribute('href') || '');
+      if (!threadId) return;
 
-      // タイトルキャッシュ
-      const titleSpan = el.querySelector('[class*="title"], [class*="text"]') || el;
-      if (threadId && titleSpan.textContent) {
-        this.originalThreadTitles.set(threadId, titleSpan.textContent.trim());
+      // 行要素（親またはlinkそのもの）
+      const rowItem = el;
+
+      if (!rowItem.dataset.gExtDraggable) {
+        rowItem.dataset.gExtDraggable = 'true';
+        rowItem.setAttribute('draggable', 'true');
+
+        // キャッシュ
+        const titleSpan = rowItem.querySelector('[class*="title"], [class*="text"], span') || rowItem;
+        if (titleSpan.textContent) {
+          this.originalThreadTitles.set(threadId, titleSpan.textContent.trim());
+        }
+
+        // ドラッグ開始
+        rowItem.addEventListener('dragstart', (e) => {
+          this.draggedThreadId = threadId;
+          e.dataTransfer.setData('text/plain', threadId);
+          e.dataTransfer.effectAllowed = 'move';
+          rowItem.classList.add('g-ext-thread-dragging');
+        });
+
+        rowItem.addEventListener('dragend', () => {
+          rowItem.classList.remove('g-ext-thread-dragging');
+          this.draggedThreadId = null;
+        });
+
+        // 確実な代替手段: スレッド横に「📁」クイック振り分けボタンを追加
+        if (!rowItem.querySelector('.g-ext-quick-folder-btn')) {
+          const quickBtn = document.createElement('button');
+          quickBtn.type = 'button';
+          quickBtn.className = 'g-ext-quick-folder-btn';
+          quickBtn.innerHTML = '📁';
+          quickBtn.title = 'このスレッドをフォルダに移動';
+          quickBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.showThreadFolderPicker(quickBtn, threadId);
+          });
+
+          // 行の末尾に挿入
+          rowItem.style.position = 'relative';
+          rowItem.appendChild(quickBtn);
+        }
       }
-
-      el.addEventListener('dragstart', (e) => {
-        this.draggedThread = threadId;
-        el.classList.add('g-ext-thread-dragging');
-        e.dataTransfer.setData('text/plain', threadId);
-      });
-
-      el.addEventListener('dragend', () => {
-        el.classList.remove('g-ext-thread-dragging');
-      });
-
-      // コンテキストメニュー用右クリックイベント
-      el.addEventListener('contextmenu', (e) => {
-        // 必要に応じてクイック振り分けメニューを表示
-      });
     });
+  }
+
+  /**
+   * D&Dに依存しない「📁 フォルダへ移動」クイックピッカー
+   */
+  showThreadFolderPicker(anchorEl, threadId) {
+    this.closeThreadContextMenu();
+
+    if (this.folders.length === 0) {
+      alert('先に「+ 新規フォルダ」からフォルダを作成してください。');
+      return;
+    }
+
+    const menu = document.createElement('div');
+    menu.id = this.contextMenuId;
+    menu.className = 'g-ext-thread-folder-menu';
+
+    menu.innerHTML = `
+      <div style="font-size:11px;font-weight:700;color:var(--g-ext-text-muted);padding:4px 8px;border-bottom:1px solid var(--g-ext-border);">
+        移動先フォルダを選択:
+      </div>
+    `;
+
+    this.folders.forEach(f => {
+      const opt = document.createElement('div');
+      opt.className = 'g-ext-folder-menu-item';
+      opt.innerHTML = `<span>${f.icon || '📁'}</span><span>${f.name}</span>`;
+      opt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.assignThreadToFolder(f.id, threadId);
+        this.closeThreadContextMenu();
+      });
+      menu.appendChild(opt);
+    });
+
+    document.body.appendChild(menu);
+
+    const rect = anchorEl.getBoundingClientRect();
+    menu.style.position = 'fixed';
+    menu.style.top = `${rect.bottom + 4}px`;
+    menu.style.left = `${Math.min(rect.left, window.innerWidth - 200)}px`;
+    menu.style.zIndex = '999999';
+  }
+
+  closeThreadContextMenu() {
+    const menu = document.getElementById(this.contextMenuId);
+    if (menu) menu.remove();
   }
 
   extractThreadId(href) {
@@ -266,6 +355,7 @@ class SidebarFoldersModule {
     if (!folder.threadIds.includes(threadId)) {
       folder.threadIds.push(threadId);
       await this.saveFolders();
+      console.log(`[Gemini Extended Suite] Assigned thread ${threadId} to folder ${folder.name}`);
     }
   }
 
@@ -282,9 +372,6 @@ class SidebarFoldersModule {
     this.renderFolders();
   }
 
-  /**
-   * フォルダ作成・設定 ＆ ハイブリッド一括リネームモーダル
-   */
   openFolderModal(targetFolder = null) {
     const isEdit = !!targetFolder;
     const folder = isEdit ? { ...targetFolder } : {
@@ -308,7 +395,7 @@ class SidebarFoldersModule {
 
         <div class="g-ext-modal-field">
           <label class="g-ext-modal-label">フォルダ名</label>
-          <input type="text" id="g-ext-folder-name-input" class="g-ext-input" value="${folder.name}" placeholder="例: 小説・創作、業務リサーチ">
+          <input type="text" id="g-ext-folder-name-input" class="g-ext-input" value="${folder.name}" placeholder="例: 創作・小説、業務リサーチ">
         </div>
 
         <div style="display:flex;gap:12px;">
@@ -323,7 +410,6 @@ class SidebarFoldersModule {
         </div>
 
         ${isEdit ? `
-        <!-- Feature 3.2: ハイブリッド一括リネームセクション -->
         <div style="border-top:1px solid var(--g-ext-border);padding-top:12px;">
           <span class="g-ext-modal-label" style="display:block;margin-bottom:6px;color:var(--g-ext-primary);font-weight:700;">
             ✨ ハイブリッド一括リネーム（タグ/絵文字挿入）
@@ -339,9 +425,7 @@ class SidebarFoldersModule {
 
           <div class="g-ext-modal-field">
             <label class="g-ext-modal-label">対象スレッド一覧（個別除外チェック）</label>
-            <div class="g-ext-thread-checklist" id="g-ext-rename-thread-list">
-              <!-- JSで動的生成 -->
-            </div>
+            <div class="g-ext-thread-checklist" id="g-ext-rename-thread-list"></div>
           </div>
 
           <label class="g-ext-checkbox-item" style="margin-top:8px;">
@@ -371,7 +455,6 @@ class SidebarFoldersModule {
 
     document.body.appendChild(modalBackdrop);
 
-    // スレッドチェックリストの挿入
     if (isEdit) {
       const listContainer = modalBackdrop.querySelector('#g-ext-rename-thread-list');
       if (folder.threadIds && folder.threadIds.length > 0) {
@@ -390,12 +473,10 @@ class SidebarFoldersModule {
       }
     }
 
-    // イベント登録
     const close = () => modalBackdrop.remove();
     modalBackdrop.querySelector('.g-ext-modal-close').addEventListener('click', close);
     modalBackdrop.querySelector('#g-ext-modal-cancel').addEventListener('click', close);
 
-    // 削除ボタン
     if (isEdit) {
       modalBackdrop.querySelector('#g-ext-btn-delete-folder').addEventListener('click', async () => {
         if (confirm(`フォルダ「${folder.name}」を削除してもよろしいですか？（スレッドは保持されます）`)) {
@@ -406,7 +487,6 @@ class SidebarFoldersModule {
       });
     }
 
-    // 保存・一括リネーム実行
     modalBackdrop.querySelector('#g-ext-modal-save').addEventListener('click', async () => {
       const nameInput = modalBackdrop.querySelector('#g-ext-folder-name-input').value.trim();
       const iconInput = modalBackdrop.querySelector('#g-ext-folder-icon-input').value.trim() || '📁';
@@ -425,7 +505,6 @@ class SidebarFoldersModule {
         const index = this.folders.findIndex(f => f.id === folder.id);
         if (index !== -1) this.folders[index] = folder;
 
-        // 一括リネームの実行判定
         const prefixInput = modalBackdrop.querySelector('#g-ext-rename-prefix-input')?.value;
         const syncOfficial = modalBackdrop.querySelector('#g-ext-sync-official-checkbox')?.checked;
         const checkedBoxes = Array.from(modalBackdrop.querySelectorAll('.g-ext-rename-target-cb:checked'));
@@ -445,21 +524,12 @@ class SidebarFoldersModule {
     });
   }
 
-  /**
-   * ハイブリッド一括リネーム処理
-   * 1. ローカル即時反映（DOM書き換え、ゼロ遅延）
-   * 2. 公式サーバー同期（400msディレイ順次処理）
-   */
   async executeHybridRename(modal, targetThreadIds, prefix, syncOfficial) {
-    console.log(`[Gemini Extended Suite] Executing hybrid rename on ${targetThreadIds.length} threads`);
-
-    // 1. ローカル即時反映（DOM上のタイトル書き換え）
     targetThreadIds.forEach(threadId => {
       const currentTitle = this.originalThreadTitles.get(threadId) || '会話スレッド';
       const newTitle = currentTitle.startsWith(prefix) ? currentTitle : `${prefix}${currentTitle}`;
       this.originalThreadTitles.set(threadId, newTitle);
 
-      // DOM要素を探して更新
       const links = document.querySelectorAll(`a[href*="${threadId}"]`);
       links.forEach(link => {
         const titleEl = link.querySelector('[class*="title"], [class*="text"]') || link;
@@ -467,11 +537,8 @@ class SidebarFoldersModule {
       });
     });
 
-    if (!syncOfficial) {
-      return;
-    }
+    if (!syncOfficial) return;
 
-    // 2. 公式サーバー同期（プログレスバー表示）
     const progressSection = modal.querySelector('#g-ext-progress-section');
     const statusText = modal.querySelector('#g-ext-progress-status');
     const percentText = modal.querySelector('#g-ext-progress-percent');
@@ -486,17 +553,13 @@ class SidebarFoldersModule {
       const threadId = targetThreadIds[i];
       const newTitle = this.originalThreadTitles.get(threadId);
 
-      // 進捗表示
       const currentIdx = i + 1;
       const pct = Math.round((currentIdx / total) * 100);
       if (statusText) statusText.textContent = `処理中: ${currentIdx}/${total}`;
       if (percentText) percentText.textContent = `${pct}%`;
       if (progressBar) progressBar.style.width = `${pct}%`;
 
-      // 公式リネームDOM操作シミュレーション
       await this.simulateOfficialRename(threadId, newTitle);
-
-      // レートリミット対策 400ms ディレイ
       await new Promise(r => setTimeout(r, 400));
     }
 
@@ -509,7 +572,6 @@ class SidebarFoldersModule {
     const threadLink = document.querySelector(`a[href*="${threadId}"]`);
     if (!threadLink) return;
 
-    // 3点リーダーメニューボタンを探す
     const menuBtn = threadLink.parentElement?.querySelector('button[aria-haspopup="menu"], button[aria-label*="メニュー"], button[aria-label*="オプション"]');
     if (!menuBtn) return;
 
@@ -532,7 +594,7 @@ class SidebarFoldersModule {
         }
       }
     } catch (e) {
-      console.warn(`[Gemini Extended Suite] Official rename simulation skipped for ${threadId}:`, e);
+      console.warn(`[Gemini Extended Suite] Official rename simulation skipped:`, e);
     }
   }
 

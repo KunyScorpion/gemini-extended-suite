@@ -1,6 +1,6 @@
 /**
  * Gemini Extended Suite - Feature 4: チャット全文Markdownエクスポート
- * フロントマター、Thinkingブロック含有/除外切り替え、コード言語・表・リスト高精度Markdown変換
+ * メインチャット画面（/app）での確実な常時表示（右上ツールバーまたはフローティング）
  */
 
 class ExporterMdModule {
@@ -25,30 +25,61 @@ class ExporterMdModule {
     const existing = document.getElementById(this.containerId);
     if (existing) return;
 
-    // ヘッダーまたはスレッド上部のアクション領域
+    // 1. 公式ヘッダーまたはトップバーを探索
     const targetAnchor = this.findHeaderAnchor();
-    if (!targetAnchor) return;
+    if (targetAnchor) {
+      this.mountUI(targetAnchor);
+      return;
+    }
 
-    this.mountUI(targetAnchor);
+    // 2. チャット画面（/app/*）のフォールバック: 右上フローティング・コントロールコンテナ
+    this.mountFloatingFallback();
   }
 
   findHeaderAnchor() {
     const selectors = [
       'header [class*="trailing-actions"]',
       'header [class*="actions"]',
+      'header [class*="tools"]',
       'header',
+      '[role="banner"] [class*="actions"]',
+      '[role="banner"]',
+      'app-header',
+      'mat-toolbar',
       '.top-bar-container',
+      '.chat-header',
       '[data-test-id*="header"]'
     ];
 
     for (const sel of selectors) {
       const el = document.querySelector(sel);
-      if (el) return el;
+      if (el && el.offsetHeight > 0) return el;
     }
     return null;
   }
 
   mountUI(anchor) {
+    const btn = this.createExportButton();
+    anchor.appendChild(btn);
+    console.log('[Gemini Extended Suite] Markdown Exporter mounted in header');
+  }
+
+  mountFloatingFallback() {
+    // 右上のフローティングユーティリティバーを取得または作成
+    let utilBar = document.getElementById('g-ext-top-floating-bar');
+    if (!utilBar) {
+      utilBar = document.createElement('div');
+      utilBar.id = 'g-ext-top-floating-bar';
+      utilBar.className = 'g-ext-top-floating-bar';
+      document.body.appendChild(utilBar);
+    }
+
+    const btn = this.createExportButton();
+    utilBar.appendChild(btn);
+    console.log('[Gemini Extended Suite] Markdown Exporter mounted in floating bar');
+  }
+
+  createExportButton() {
     const btn = document.createElement('button');
     btn.id = this.containerId;
     btn.type = 'button';
@@ -56,12 +87,13 @@ class ExporterMdModule {
     btn.innerHTML = `<span>📥</span><span>MD保存</span>`;
     btn.title = '現在のチャットをMarkdownファイルとしてエクスポート';
 
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       this.openExportModal();
     });
 
-    anchor.appendChild(btn);
-    console.log('[Gemini Extended Suite] Markdown Exporter mounted');
+    return btn;
   }
 
   removeUI() {
@@ -81,13 +113,13 @@ class ExporterMdModule {
         </div>
 
         <div style="font-size:13px;color:var(--g-ext-text);">
-          スレッド内の全ユーザー発言、AI回答、コードブロック、テーブルを構造化Markdownに変換してダウンロードします。
+          スレッド内の全ユーザー発言、Geminiの回答、思考プロセス、コードブロック、表を整形してMarkdown出力します。
         </div>
 
         <div class="g-ext-modal-field">
           <label class="g-ext-checkbox-item">
             <input type="checkbox" id="g-ext-export-thinking-cb" ${this.includeThinking ? 'checked' : ''}>
-            <span>思考プロセス（Thinking / Reasoningブロック）を含める</span>
+            <span>思考プロセス（Thinking / Extended Reasoning）を含める</span>
           </label>
         </div>
 
@@ -119,10 +151,8 @@ class ExporterMdModule {
     const dateStr = now.toISOString().replace(/T/, ' ').replace(/\..+/, '');
     const datePrefix = now.toISOString().slice(0, 10).replace(/-/g, '');
 
-    // スレッド内のメッセージターンを走査
     const messageTurns = this.extractMessageTurns();
 
-    // フロントマター生成
     let md = `---
 title: "${conversationTitle.replace(/"/g, '\\"')}"
 date: "${dateStr}"
@@ -149,7 +179,6 @@ generator: "Gemini Extended Suite"
       }
     });
 
-    // ファイル名サニタイズ (YYYYMMDD_[タイトル].md)
     const sanitizedTitle = conversationTitle.replace(/[\\/:*?"<>|]/g, '_').slice(0, 50);
     const filename = `${datePrefix}_${sanitizedTitle}.md`;
 
@@ -158,10 +187,8 @@ generator: "Gemini Extended Suite"
 
   extractMessageTurns() {
     const turns = [];
-
-    // メッセージコンテナのセレクタ候補
     const messageContainers = document.querySelectorAll(
-      'message-content, .message-content, [data-test-id*="message"], .conversation-turn'
+      'message-content, .message-content, [data-test-id*="message"], .conversation-turn, [class*="response-container"], [class*="user-query-container"]'
     );
 
     if (messageContainers.length > 0) {
@@ -172,7 +199,6 @@ generator: "Gemini Extended Suite"
         const thinkingEl = container.querySelector('[class*="thinking"], [class*="reasoning"], details');
         const thinkingText = thinkingEl ? thinkingEl.innerText.trim() : null;
 
-        // 本文（Thinking要素を除去したコピーから変換）
         const clone = container.cloneNode(true);
         if (thinkingEl) {
           clone.querySelectorAll('[class*="thinking"], [class*="reasoning"], details').forEach(e => e.remove());
@@ -180,14 +206,17 @@ generator: "Gemini Extended Suite"
 
         const mdContent = this.convertElementToMarkdown(clone);
 
-        turns.push({
-          role: isUser ? 'user' : 'model',
-          content: mdContent.trim(),
-          thinking: thinkingText
-        });
+        if (mdContent.trim()) {
+          turns.push({
+            role: isUser ? 'user' : 'model',
+            content: mdContent.trim(),
+            thinking: thinkingText
+          });
+        }
       });
-    } else {
-      // フォールバック: テキスト全体から推測
+    }
+
+    if (turns.length === 0) {
       const text = document.body.innerText;
       turns.push({
         role: 'model',
@@ -199,13 +228,9 @@ generator: "Gemini Extended Suite"
     return turns;
   }
 
-  /**
-   * HTML要素を正確なMarkdown構文に変換するパーサー
-   */
   convertElementToMarkdown(element) {
     if (!element) return '';
 
-    // コードブロックの事前保護
     element.querySelectorAll('pre').forEach(pre => {
       const code = pre.querySelector('code');
       const lang = code?.className?.replace(/language-/, '') || pre.getAttribute('data-language') || '';
@@ -213,7 +238,6 @@ generator: "Gemini Extended Suite"
       pre.setAttribute('data-md-code', `\n\`\`\`${lang}\n${text}\n\`\`\`\n`);
     });
 
-    // テーブルの変換
     element.querySelectorAll('table').forEach(table => {
       let tableMd = '\n';
       const rows = Array.from(table.querySelectorAll('tr'));

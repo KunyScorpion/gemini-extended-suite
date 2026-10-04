@@ -1,18 +1,44 @@
 /**
  * Gemini Extended Suite - Feature 1: モデル選択ワンタッチバー
+ * 2026年10月最新Web版Geminiモデル（3.8 Flash / 3.1 Pro / 4 Argon / Thinking）対応
  * チャット入力ボックス直上にピル型ボタンを配置し、ワンクリックでモデルを切り替え
  */
 
 class ModelSwitcherModule {
   constructor() {
     this.containerId = 'g-ext-model-bar-root';
+    // 2026年10月最新Web版Geminiモデル一覧
     this.models = [
-      { id: 'flash', name: 'Gemini 2.5 Flash', tag: 'Fast', keywords: ['flash', '高速'] },
-      { id: 'pro', name: 'Gemini 2.5 Pro', tag: 'Pro', keywords: ['pro', '高度'] },
-      { id: 'thinking', name: 'Gemini 2.5 Thinking', tag: 'Reasoning', keywords: ['thinking', '思考', 'deep'] },
-      { id: 'flagship', name: 'Gemini 3.0 Ultra', tag: 'Flagship', keywords: ['ultra', 'flagship', '3.0'] }
+      {
+        id: 'flash-38',
+        name: 'Gemini 3.8 Flash',
+        tag: 'Fast',
+        badge: '⚡',
+        keywords: ['3.8 flash', 'flash', '高速']
+      },
+      {
+        id: 'pro-31',
+        name: 'Gemini 3.1 Pro',
+        tag: 'Pro',
+        badge: '🧠',
+        keywords: ['3.1 pro', 'pro', '高度']
+      },
+      {
+        id: 'argon-4',
+        name: 'Gemini 4 Argon',
+        tag: 'Frontier',
+        badge: '✨',
+        keywords: ['4 argon', 'argon', '4.0', 'ultra', 'フロンティア', 'frontier']
+      },
+      {
+        id: 'thinking-38',
+        name: 'Gemini 3.8 Thinking',
+        tag: 'Reasoning',
+        badge: '💭',
+        keywords: ['thinking', '思考', 'high', 'deep', 'extended thinking']
+      }
     ];
-    this.currentModelId = 'flash';
+    this.currentModelId = 'flash-38';
     this.enabled = true;
   }
 
@@ -32,12 +58,10 @@ class ModelSwitcherModule {
 
     const existing = document.getElementById(this.containerId);
     if (existing) {
-      // 既存UIがある場合、アクティブ状態を再同期
       this.syncActiveState();
       return;
     }
 
-    // チャット入力欄のコンテナを探索
     const inputContainer = this.findInputContainer();
     if (!inputContainer) return;
 
@@ -45,21 +69,20 @@ class ModelSwitcherModule {
   }
 
   findInputContainer() {
-    // 2026/Post-Gemini 入力コンテナのセレクタ候補
     const selectors = [
       '.input-area-container',
       '.chat-input-container',
       'rich-textarea',
       '[class*="input-box"]',
       '[class*="bottom-container"]',
+      'form[class*="query"]',
       'footer',
-      'form[class*="query"]'
+      '[role="region"][aria-label*="プロンプト"]'
     ];
 
     for (const sel of selectors) {
       const el = document.querySelector(sel);
       if (el) {
-        // 入力親要素または直前
         return el.parentElement || el;
       }
     }
@@ -81,6 +104,11 @@ class ModelSwitcherModule {
       pill.type = 'button';
       pill.className = `g-ext-model-pill ${m.id === this.currentModelId ? 'active' : ''}`;
       pill.dataset.modelId = m.id;
+      pill.title = `${m.name} (${m.tag})`;
+
+      const badge = document.createElement('span');
+      badge.textContent = m.badge;
+      badge.style.fontSize = '12px';
 
       const dot = document.createElement('span');
       dot.className = 'g-ext-model-pill-dot';
@@ -88,6 +116,7 @@ class ModelSwitcherModule {
       const text = document.createElement('span');
       text.textContent = m.name;
 
+      pill.appendChild(badge);
       pill.appendChild(dot);
       pill.appendChild(text);
 
@@ -99,9 +128,9 @@ class ModelSwitcherModule {
       bar.appendChild(pill);
     });
 
-    // 入力エリアの手前に挿入
     parent.insertBefore(bar, parent.firstChild);
-    console.log('[Gemini Extended Suite] Model Switcher Bar mounted');
+    this.syncActiveState();
+    console.log('[Gemini Extended Suite] 2026/10 Model Switcher Bar mounted');
   }
 
   removeUI() {
@@ -114,12 +143,23 @@ class ModelSwitcherModule {
     if (!container) return;
 
     // 公式UIの現在の選択テキストを検出
-    const officialSelector = document.querySelector('[aria-label*="モデル"], [data-test-id*="model"], .model-selector-button');
-    if (officialSelector) {
-      const text = (officialSelector.textContent || '').toLowerCase();
-      const matched = this.models.find(m => m.keywords.some(k => text.includes(k)));
-      if (matched && matched.id !== this.currentModelId) {
-        this.currentModelId = matched.id;
+    const officialSelectors = [
+      '[aria-label*="モデル"]',
+      '[data-test-id*="model"]',
+      '.model-selector-button',
+      '[class*="model-pill"]',
+      'button[aria-haspopup="menu"]:has([class*="model"])'
+    ];
+
+    for (const sel of officialSelectors) {
+      const el = document.querySelector(sel);
+      if (el) {
+        const text = (el.textContent || el.getAttribute('aria-label') || '').toLowerCase();
+        const matched = this.models.find(m => m.keywords.some(k => text.includes(k)));
+        if (matched && matched.id !== this.currentModelId) {
+          this.currentModelId = matched.id;
+          break;
+        }
       }
     }
 
@@ -138,8 +178,6 @@ class ModelSwitcherModule {
     this.syncActiveState();
 
     console.log(`[Gemini Extended Suite] Switching model to: ${model.name}`);
-
-    // 公式UIのドロップダウンメニュー操作をシミュレーション
     await this.triggerOfficialModelSwitch(model);
   }
 
@@ -148,32 +186,35 @@ class ModelSwitcherModule {
     const triggers = Array.from(document.querySelectorAll('button, div[role="button"]'))
       .filter(el => {
         const label = (el.getAttribute('aria-label') || el.textContent || '').toLowerCase();
-        return label.includes('model') || label.includes('モデル') || el.getAttribute('aria-haspopup') === 'menu';
+        return (label.includes('model') || label.includes('モデル') || label.includes('gemini') || label.includes('flash') || label.includes('pro'))
+          && (el.getAttribute('aria-haspopup') === 'menu' || el.getAttribute('aria-expanded') !== null || el.classList.value.includes('selector'));
       });
 
-    const trigger = triggers[0];
+    const trigger = triggers[0] || document.querySelector('[aria-label*="モデル"], [data-test-id*="model-picker"]');
     if (!trigger) {
-      console.warn('[Gemini Extended Suite] Official model trigger not found, simulating fallback');
+      console.warn('[Gemini Extended Suite] Official model trigger not found in DOM');
       return;
     }
 
-    // ドロップダウンを開く
-    trigger.click();
-    await new Promise(r => setTimeout(r, 120));
-
-    // メニュー項目から対象モデルを探す
-    const menuItems = Array.from(document.querySelectorAll('[role="menuitem"], [role="option"], mat-option, div[class*="menu-item"]'));
-    const targetItem = menuItems.find(item => {
-      const text = (item.textContent || '').toLowerCase();
-      return model.keywords.some(k => text.includes(k));
-    });
-
-    if (targetItem) {
-      targetItem.click();
-      console.log(`[Gemini Extended Suite] Successfully triggered official switch for ${model.name}`);
-    } else {
-      // 該当なしの場合はメニューを閉じる
+    try {
       trigger.click();
+      await new Promise(r => setTimeout(r, 150));
+
+      const menuItems = Array.from(document.querySelectorAll('[role="menuitem"], [role="option"], mat-option, div[class*="menu-item"], div[class*="item"]'));
+      const targetItem = menuItems.find(item => {
+        const text = (item.textContent || '').toLowerCase();
+        return model.keywords.some(k => text.includes(k));
+      });
+
+      if (targetItem) {
+        targetItem.click();
+        console.log(`[Gemini Extended Suite] Selected model menu item for ${model.name}`);
+      } else {
+        // メニュー外クリックで閉じる
+        document.body.click();
+      }
+    } catch (err) {
+      console.error('[Gemini Extended Suite] Error during model switch simulation:', err);
     }
   }
 }
