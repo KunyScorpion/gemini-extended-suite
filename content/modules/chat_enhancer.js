@@ -149,46 +149,73 @@ class ChatEnhancerModule {
     const listBody = document.getElementById('g-ext-toc-list-body');
     if (!listBody) return;
 
-    // ユーザー質問要素の収集
-    const userQueryElements = Array.from(document.querySelectorAll(
-      '[class*="user-query"], .user-query, [data-role="user"], message-content:has([class*="user"]), [class*="user-turn"]'
-    )).filter(el => (el.textContent || '').trim().length > 0);
+    // 1. ユーザー発言要素の候補を収集
+    const rawElements = Array.from(document.querySelectorAll(
+      '.user-query, [class*="user-query"], user-query, [data-role="user"], [class*="user-turn"]'
+    )).filter(el => {
+      const txt = (el.textContent || '').trim();
+      return txt.length > 0 && !el.closest('.g-ext-toc-container');
+    });
 
-    // シグネチャを作成し、変更がない場合はDOMを再描画しない（フリッカーを完全防止！）
-    const signature = userQueryElements.map(el => (el.textContent || '').trim().slice(0, 30)).join('||');
+    // 2. 包含関係の排除（他の候補要素の中に含まれている子要素は除外）
+    const topLevelUserElements = rawElements.filter(el => {
+      return !rawElements.some(other => other !== el && other.contains(el));
+    });
+
+    // 3. テキストの重複排除と整形
+    const uniqueTurns = [];
+    const seenTexts = new Set();
+
+    topLevelUserElements.forEach(el => {
+      let rawText = (el.innerText || el.textContent || '').trim();
+
+      // 「あなたのプロンプト」や「ユーザー」などのアクセシビリティ用ノイズプレフィックスを除去
+      let cleaned = rawText
+        .replace(/^(あなたのプロンプト|ユーザーのプロンプト|ユーザー|User said|You said)[\s:：>＞]*/i, '')
+        .trim();
+
+      if (!cleaned) cleaned = rawText; // 万が一空になった場合は元テキスト
+
+      // 先頭30文字で重複チェック（同一発言の重複登録を防止）
+      const key = cleaned.slice(0, 30);
+      if (!seenTexts.has(key)) {
+        seenTexts.add(key);
+        uniqueTurns.push({ element: el, text: cleaned });
+      }
+    });
+
+    // 4. シグネチャ照合（フリッカー防止）
+    const signature = uniqueTurns.map(t => t.text.slice(0, 20)).join('||');
     if (signature === this.lastTocSignature && listBody.children.length > 0) {
-      return; // 変更なしのためスキップ
+      return;
     }
     this.lastTocSignature = signature;
 
     listBody.innerHTML = '';
 
-    if (userQueryElements.length === 0) {
+    if (uniqueTurns.length === 0) {
       listBody.innerHTML = `<span style="font-size:11px;color:var(--g-ext-text-muted);padding:4px;">発言がありません</span>`;
       return;
     }
 
-    userQueryElements.forEach((qEl, idx) => {
-      const text = (qEl.innerText || qEl.textContent || '').trim();
-      const preview = text.length > 22 ? text.slice(0, 22) + '…' : text;
+    uniqueTurns.forEach((turn, idx) => {
+      const preview = turn.text.length > 20 ? turn.text.slice(0, 20) + '…' : turn.text;
 
       const item = document.createElement('div');
       item.className = 'g-ext-toc-item';
-      item.innerHTML = `<span style="color:var(--g-ext-primary);font-weight:700;margin-right:4px;">#${idx + 1}</span><span>${preview || '質問'}</span>`;
-      item.title = text;
+      item.innerHTML = `<span style="color:var(--g-ext-primary);font-weight:700;margin-right:4px;">#${idx + 1}</span><span>${preview}</span>`;
+      item.title = turn.text;
 
       item.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
 
-        // 対象要素へスムーズスクロール
-        qEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        turn.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-        // 一瞬ハイライト
-        qEl.style.transition = 'outline 0.2s ease';
-        qEl.style.outline = '2px solid var(--g-ext-primary)';
+        turn.element.style.transition = 'outline 0.2s ease';
+        turn.element.style.outline = '2px solid var(--g-ext-primary)';
         setTimeout(() => {
-          qEl.style.outline = 'none';
+          turn.element.style.outline = 'none';
         }, 1200);
       });
 
