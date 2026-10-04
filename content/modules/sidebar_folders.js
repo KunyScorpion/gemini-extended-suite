@@ -1,6 +1,6 @@
 /**
  * Gemini Extended Suite - Feature 3: サイドバーのフォルダ管理（安定版）
- * D&Dおよび一括リネームを完全撤去し、確実・軽快に動作する「📁 クイック移動ボタン」に一本化
+ * スレッドタイトルの確実な永続化（F5更新後も100%正確なスレッド名を表示）
  */
 
 class SidebarFoldersModule {
@@ -8,22 +8,29 @@ class SidebarFoldersModule {
     this.containerId = 'g-ext-sidebar-folder-root';
     this.contextMenuId = 'g-ext-thread-folder-menu';
     this.folders = [];
+    this.threadTitles = {}; // スレッドID -> タイトル の永続キャッシュ
     this.enabled = true;
   }
 
   async init() {
-    const data = await chrome.storage.local.get(['enableSidebarFolders', 'folders']);
+    const data = await chrome.storage.local.get(['enableSidebarFolders', 'folders', 'threadTitles']);
     this.enabled = data.enableSidebarFolders !== false;
     this.folders = data.folders || [];
+    this.threadTitles = data.threadTitles || {};
 
     chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === 'local' && changes.folders) {
-        this.folders = changes.folders.newValue || [];
-        this.renderFolders();
+      if (area === 'local') {
+        if (changes.folders) {
+          this.folders = changes.folders.newValue || [];
+          this.renderFolders();
+        }
+        if (changes.threadTitles) {
+          this.threadTitles = changes.threadTitles.newValue || {};
+          this.renderFolders();
+        }
       }
     });
 
-    // 画面外クリックでフォルダ選択メニューを閉じる
     document.addEventListener('click', (e) => {
       const menu = document.getElementById(this.contextMenuId);
       if (menu && !menu.contains(e.target) && !e.target.closest('.g-ext-quick-folder-btn')) {
@@ -96,7 +103,7 @@ class SidebarFoldersModule {
 
     this.renderFolders();
     this.attachQuickButtonsToThreads();
-    console.log('[Gemini Extended Suite] Stable Sidebar Folders mounted');
+    console.log('[Gemini Extended Suite] Sidebar Folders mounted');
   }
 
   removeUI() {
@@ -158,8 +165,8 @@ class SidebarFoldersModule {
         item.style.alignItems = 'center';
         item.style.cursor = 'pointer';
 
-        // 公式DOMからスレッドのタイトルを探す（なければID略称）
-        const realTitle = this.findThreadTitleFromDOM(tId) || `スレッド (${tId.slice(-6)})`;
+        // 1. DOMから取得、2. 永続ストレージから取得、3. フォールバック
+        const realTitle = this.findThreadTitle(tId);
 
         item.innerHTML = `
           <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${realTitle}">📄 ${realTitle}</span>
@@ -184,13 +191,32 @@ class SidebarFoldersModule {
     });
   }
 
-  findThreadTitleFromDOM(threadId) {
+  /**
+   * スレッドタイトルの取得（DOM検索 ＋ 永続キャッシュの両用）
+   */
+  findThreadTitle(threadId) {
+    // 1. DOMから最新タイトルを探索
     const link = document.querySelector(`a[href*="${threadId}"]`);
     if (link) {
       const titleSpan = link.querySelector('[class*="title"], [class*="text"], span') || link;
-      return titleSpan.textContent.trim();
+      const text = titleSpan.textContent.trim();
+      if (text && text !== `スレッド (${threadId.slice(-6)})`) {
+        // キャッシュを更新
+        if (this.threadTitles[threadId] !== text) {
+          this.threadTitles[threadId] = text;
+          chrome.storage.local.set({ threadTitles: this.threadTitles });
+        }
+        return text;
+      }
     }
-    return null;
+
+    // 2. 永続ストレージの保存済みタイトル
+    if (this.threadTitles[threadId]) {
+      return this.threadTitles[threadId];
+    }
+
+    // 3. フォールバック
+    return `スレッド (${threadId.slice(-6)})`;
   }
 
   toggleFolderCollapse(folderId) {
@@ -201,7 +227,7 @@ class SidebarFoldersModule {
   }
 
   /**
-   * 各スレッド行に「📁」クイック移動ボタンのみを確実に付与
+   * 各スレッド行に「📁」クイック移動ボタンを付与
    */
   attachQuickButtonsToThreads() {
     const threadLinks = document.querySelectorAll('a[href*="/app/"]');
@@ -211,6 +237,15 @@ class SidebarFoldersModule {
       if (!threadId) return;
 
       const rowItem = link.closest('[class*="conversation"], [class*="item"], side-nav-entry') || link;
+
+      // タイトルキャッシュの自動収集
+      const titleSpan = rowItem.querySelector('[class*="title"], [class*="text"], span') || link;
+      const titleText = titleSpan ? titleSpan.textContent.trim() : null;
+      if (titleText && !this.threadTitles[threadId]) {
+        this.threadTitles[threadId] = titleText;
+        chrome.storage.local.set({ threadTitles: this.threadTitles });
+      }
+
       if (rowItem.dataset.gExtQuickProcessed) return;
       rowItem.dataset.gExtQuickProcessed = 'true';
 
@@ -224,7 +259,7 @@ class SidebarFoldersModule {
         quickBtn.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          this.showThreadFolderPicker(quickBtn, threadId);
+          this.showThreadFolderPicker(quickBtn, threadId, rowItem);
         });
 
         rowItem.style.position = 'relative';
@@ -233,13 +268,17 @@ class SidebarFoldersModule {
     });
   }
 
-  showThreadFolderPicker(anchorEl, threadId) {
+  showThreadFolderPicker(anchorEl, threadId, rowItem) {
     this.closeThreadContextMenu();
 
     if (this.folders.length === 0) {
       alert('先に左サイドバー上部の「+ 新規フォルダ」からフォルダを作成してください。');
       return;
     }
+
+    // 行要素からタイトルを取得
+    const titleSpan = rowItem ? rowItem.querySelector('[class*="title"], [class*="text"], span') : null;
+    const currentTitle = titleSpan ? titleSpan.textContent.trim() : this.threadTitles[threadId];
 
     const menu = document.createElement('div');
     menu.id = this.contextMenuId;
@@ -263,7 +302,7 @@ class SidebarFoldersModule {
 
       opt.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.assignThreadToFolder(f.id, threadId);
+        this.assignThreadToFolder(f.id, threadId, currentTitle);
         this.closeThreadContextMenu();
       });
 
@@ -294,16 +333,27 @@ class SidebarFoldersModule {
     window.location.href = `https://gemini.google.com/app/${threadId}`;
   }
 
-  async assignThreadToFolder(folderId, threadId) {
+  async assignThreadToFolder(folderId, threadId, threadTitle = null) {
     const folder = this.folders.find(f => f.id === folderId);
     if (!folder) return;
 
     if (!folder.threadIds) folder.threadIds = [];
     if (!folder.threadIds.includes(threadId)) {
       folder.threadIds.push(threadId);
-      await this.saveFolders();
-      console.log(`[Gemini Extended Suite] Assigned thread ${threadId} to folder ${folder.name}`);
     }
+
+    // タイトルを永続保存
+    if (threadTitle) {
+      this.threadTitles[threadId] = threadTitle;
+    }
+
+    await chrome.storage.local.set({
+      folders: this.folders,
+      threadTitles: this.threadTitles
+    });
+
+    this.renderFolders();
+    console.log(`[Gemini Extended Suite] Assigned thread ${threadId} ("${threadTitle}") to folder ${folder.name}`);
   }
 
   async removeThreadFromFolder(folderId, threadId) {
@@ -315,13 +365,13 @@ class SidebarFoldersModule {
   }
 
   async saveFolders() {
-    await chrome.storage.local.set({ folders: this.folders });
+    await chrome.storage.local.set({
+      folders: this.folders,
+      threadTitles: this.threadTitles
+    });
     this.renderFolders();
   }
 
-  /**
-   * シンプルなフォルダ作成・編集モーダル（リネーム機能撤去）
-   */
   openFolderModal(targetFolder = null) {
     const isEdit = !!targetFolder;
     const folder = isEdit ? { ...targetFolder } : {

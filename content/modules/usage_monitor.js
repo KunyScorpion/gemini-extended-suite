@@ -171,7 +171,7 @@ class UsageMonitorModule {
         </div>
 
         <div style="font-size:12px;color:var(--g-ext-text);margin-top:6px;border-top:1px dashed var(--g-ext-border);padding-top:4px;">
-          1週間の上限: <strong style="color:var(--g-ext-text);">${this.officialData.weeklyUsage}</strong>
+          1週間の上限: <strong style="color:var(--g-ext-primary);">${this.officialData.weeklyUsage}</strong>
         </div>
         <div style="font-size:11px;color:var(--g-ext-text-muted);">
           ${this.officialData.weeklyReset || ''}
