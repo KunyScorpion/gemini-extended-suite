@@ -2,7 +2,7 @@
 
 > **対象ブラウザ**: Chromium系（Google Chrome & Microsoft Edge）  
 > **対象プラットフォーム**: Gemini Web Interface (`gemini.google.com`)  
-> **バージョン**: 1.3.1
+> **バージョン**: 1.3.2
 
 ---
 

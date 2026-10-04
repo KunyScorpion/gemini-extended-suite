@@ -21,8 +21,10 @@ class GeminiDomObserver {
     this._hookHistoryEvents();
     this._setupMutationObserver();
 
-    // 初回マウント
+    // 初回マウント（SPAの段階的レンダリングに追従）
     setTimeout(() => this.notifyModules(), 200);
+    setTimeout(() => this.notifyModules(), 600);
+    setTimeout(() => this.notifyModules(), 1500);
   }
 
   registerModule(name, moduleInstance) {

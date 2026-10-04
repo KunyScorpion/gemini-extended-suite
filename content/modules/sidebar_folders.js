@@ -31,10 +31,19 @@ class SidebarFoldersModule {
       }
     });
 
+    window.addEventListener('resize', () => {
+      this.updateVisibility();
+    });
+
     document.addEventListener('click', (e) => {
       const menu = document.getElementById(this.contextMenuId);
       if (menu && !menu.contains(e.target) && !e.target.closest('.g-ext-quick-folder-btn')) {
         this.closeThreadContextMenu();
+      }
+      // サイドバー開閉トグルボタンのクリック検知
+      if (e.target.closest('button[aria-label*="メニュー"], button[aria-label*="サイドバー"], button[aria-label*="Menu"], button[data-test-id*="side-nav"]')) {
+        setTimeout(() => this.updateVisibility(), 100);
+        setTimeout(() => this.updateVisibility(), 300);
       }
     });
   }
@@ -45,38 +54,112 @@ class SidebarFoldersModule {
       return;
     }
 
+    const anchor = this.findChatHistoryAnchor();
     const existing = document.getElementById(this.containerId);
-    if (existing) {
-      this.attachQuickButtonsToThreads();
+
+    // チャット履歴（アンカー要素）がまだDOMにない場合
+    if (!anchor || !anchor.parentElement) {
+      // 初期ロード中など。安易な外枠やヘッダーへの誤爆挿入を防ぐため待機。
+      if (existing) {
+        this.updateVisibility();
+      }
       return;
     }
 
-    const sidebarContainer = this.findSidebarHistoryContainer();
-    if (!sidebarContainer) return;
+    const parent = anchor.parentElement;
 
-    this.mountUI(sidebarContainer);
+    if (existing) {
+      // 既存のフォルダセクションが正しいアンカーの直前にあるかを自己検証・修復
+      if (existing.parentElement !== parent || existing.nextElementSibling !== anchor) {
+        console.log('[Gemini Extended Suite] フォルダセクションをチャット履歴の直前へ再配置します');
+        parent.insertBefore(existing, anchor);
+      }
+      this.attachQuickButtonsToThreads();
+      this.updateVisibility();
+      return;
+    }
+
+    this.mountUI(parent, anchor);
   }
 
-  findSidebarHistoryContainer() {
-    const selectors = [
-      'nav[aria-label*="チャット"], nav[aria-label*="履歴"], nav[aria-label*="Conversations"]',
-      '.conversation-container',
+  /**
+   * チャット履歴の直前（アンカー要素）を精密に特定
+   * ヘッダーやロゴへの誤爆マウントを100%防ぐため、確実なチャット履歴要素のみを対象とする
+   */
+  findChatHistoryAnchor() {
+    // 1. スクロール可能なサイドバーコンテンツ領域を優先探索
+    const overflowContainers = Array.from(
+      document.querySelectorAll('[data-test-id="overflow-container"], .overflow-container')
+    );
+    const activeContainer = overflowContainers.find(c => {
+      const rect = c.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    }) || overflowContainers[0];
+    const root = activeContainer || document;
+
+    // 2. チャット履歴の明示的アコーディオン／セクション
+    const sectionSelectors = [
+      'expandable-section[data-test-id="chats-expandable-section"]',
+      '[data-test-id="all-conversations"]',
+      '.chat-history',
       '.recent-conversations-container',
-      'side-nav',
-      'mat-nav-list',
-      'nav',
-      'aside',
-      '[role="navigation"]'
+      '.conversation-container',
+      'nav[aria-label*="チャット"]',
+      'nav[aria-label*="履歴"]',
+      'nav[aria-label*="Conversations"]',
+      'nav[aria-label*="Recent"]'
     ];
 
-    for (const sel of selectors) {
-      const el = document.querySelector(sel);
-      if (el) return el;
+    for (const sel of sectionSelectors) {
+      const el = root.querySelector(sel);
+      if (el && el.parentElement) {
+        const section = el.closest('expandable-section') || el;
+        if (section.parentElement) return section;
+      }
     }
+
+    // 3. 実際の会話行（スレッド）から親セクションを逆引き
+    const firstConv = root.querySelector('[data-test-id="conversation"]') || root.querySelector('a[href*="/app/"]');
+    if (firstConv) {
+      const section = firstConv.closest('expandable-section') ||
+                      firstConv.closest('.chat-history, [class*="conversation-container"], mat-nav-list');
+      if (section && section.parentElement) {
+        return section;
+      }
+      const rowItem = firstConv.closest('[data-test-id="conversation"]') || firstConv;
+      if (rowItem && rowItem.parentElement) {
+        return rowItem;
+      }
+    }
+
+    // 4. チャット履歴がまだ描画されていない場合は null を返す（ヘッダーへの誤爆挿入を完全防止）
     return null;
   }
 
-  mountUI(sidebar) {
+  isSidebarOpen() {
+    if (document.querySelector('chat-app.side-nav-open, #app-root.side-nav-open, .side-nav-open')) {
+      return true;
+    }
+    const sidebar = document.querySelector('bard-sidenav, side-nav, [data-test-id="overflow-container"]');
+    if (sidebar instanceof HTMLElement) {
+      const rect = sidebar.getBoundingClientRect();
+      return rect.width > 120;
+    }
+    return true;
+  }
+
+  updateVisibility() {
+    const section = document.getElementById(this.containerId);
+    if (!section) return;
+
+    if (this.isSidebarOpen()) {
+      section.style.display = '';
+    } else {
+      section.style.display = 'none';
+    }
+  }
+
+  mountUI(parent, anchor) {
     const section = document.createElement('div');
     section.id = this.containerId;
     section.className = 'g-ext-folder-section';
@@ -95,7 +178,8 @@ class SidebarFoldersModule {
     section.appendChild(header);
     section.appendChild(folderList);
 
-    sidebar.insertBefore(section, sidebar.firstChild);
+    // アンカー（チャット履歴）の直前に挿入！
+    parent.insertBefore(section, anchor);
 
     header.querySelector('#g-ext-btn-new-folder').addEventListener('click', () => {
       this.openFolderModal();
@@ -103,7 +187,8 @@ class SidebarFoldersModule {
 
     this.renderFolders();
     this.attachQuickButtonsToThreads();
-    console.log('[Gemini Extended Suite] Sidebar Folders mounted');
+    this.updateVisibility();
+    console.log('[Gemini Extended Suite] Sidebar Folders safely mounted above chat history');
   }
 
   removeUI() {

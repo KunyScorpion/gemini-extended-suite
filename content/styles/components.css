@@ -22,9 +22,16 @@
    サイドバーのフォルダ管理（安定版）
    ========================================================================== */
 .g-ext-folder-section {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
   padding: 8px 12px;
   border-bottom: 1px solid var(--g-ext-border);
   margin-bottom: 8px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 5;
+  overflow: hidden;
 }
 
 .g-ext-folder-section-header {
