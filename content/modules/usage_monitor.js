@@ -1,7 +1,6 @@
 /**
  * Gemini Extended Suite - Feature 5: 公式使用状況・上限常時インジケーター
- * チャット画面のまま、裏側で https://gemini.google.com/usage から自動取得・同期
- * 無駄なループやCPU負荷ゼロで、完全自動バックグラウンド更新を実現
+ * DOMExceptionを完全根絶し、安全な非アクティブ裏タブ経由で公式/usageから自動同期
  */
 
 class UsageMonitorModule {
@@ -11,7 +10,7 @@ class UsageMonitorModule {
     this.isPopoverOpen = false;
     this.isFetching = false;
     this.lastFetchTime = 0;
-    this.cooldownMs = 2 * 60 * 1000; // クールダウン: 2分間
+    this.cooldownMs = 2 * 60 * 1000; // 2分間クールダウン
 
     this.officialData = null;
   }
@@ -23,24 +22,26 @@ class UsageMonitorModule {
       this.officialData = data.geminiOfficialQuota;
     }
 
+    // ストレージ変更を監視（裏タブで同期されたら即座にチャット画面のUIを更新）
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'local' && changes.geminiOfficialQuota) {
         this.officialData = changes.geminiOfficialQuota.newValue;
+        this.isFetching = false;
         this.updateUI();
       }
     });
 
-    // 1. Geminiを開いたとき（初回）に自動バックグラウンド取得（2秒遅延）
+    // 1. 初回Geminiアクセス時（2秒後）に自動バックグラウンド取得
     setTimeout(() => {
-      this.triggerAutoFetchInBackground(false);
-    }, 2500);
+      this.triggerBackgroundTabSync(false);
+    }, 2000);
 
-    // 2. 新規チャット作成・スレッド切り替え時（URL変化）に自動取得
+    // 2. スレッド切り替え時（URL変化時）に自動取得（クールダウンあり）
     window.addEventListener('g-ext-url-changed', () => {
-      this.triggerAutoFetchInBackground(false);
+      this.triggerBackgroundTabSync(false);
     });
 
-    // 3. /usage ページそのものを開いている場合の直接スクレイピング
+    // 3. 自身が /usage ページそのものを開いている場合の直接スクレイピング
     this.checkIfDirectlyOnUsagePage();
   }
 
@@ -112,13 +113,13 @@ class UsageMonitorModule {
       }
     });
 
-    // 🔄 更新ボタン（手動で即時バックグラウンド取得）
+    // 🔄 更新ボタン（手動で即座に裏タブ同期実行）
     wrap.querySelector('#g-ext-btn-refresh-usage').addEventListener('click', (e) => {
       e.stopPropagation();
-      this.triggerAutoFetchInBackground(true);
+      this.triggerBackgroundTabSync(true);
     });
 
-    // 公式ページを直接開く
+    // 公式ページを開く
     wrap.querySelector('#g-ext-btn-open-usage-page').addEventListener('click', (e) => {
       e.stopPropagation();
       window.open('https://gemini.google.com/usage', '_blank');
@@ -196,16 +197,16 @@ class UsageMonitorModule {
   }
 
   /**
-   * チャット画面のまま、裏側の非表示iframeで https://gemini.google.com/usage を読み取り自動同期
+   * Service Worker に要請して非アクティブ裏タブ経由で自動同期（DOMException完全回避）
    * @param {boolean} force クールダウンを無視して強制取得するか
    */
-  triggerAutoFetchInBackground(force = false) {
-    // 自身が /usage ページそのものにいる場合はiframeを作らない
-    if (window.location.pathname.startsWith('/usage')) return;
+  triggerBackgroundTabSync(force = false) {
+    // 自身が /usage ページそのものにいる場合は裏タブ不要
+    if (window.location.pathname.startsWith('/usage') || window.location.href.includes('/usage')) return;
 
     const now = Date.now();
     if (!force && (now - this.lastFetchTime < this.cooldownMs)) {
-      console.log('[Gemini Extended Suite] Usage fetch skipped (within cooldown)');
+      console.log('[Gemini Extended Suite] Usage sync skipped (cooldown active)');
       return;
     }
 
@@ -214,30 +215,31 @@ class UsageMonitorModule {
     this.lastFetchTime = now;
     this.updateUI();
 
-    console.log('[Gemini Extended Suite] Fetching official usage in background iframe...');
+    console.log('[Gemini Extended Suite] Requesting background tab sync from Service Worker...');
+    
+    chrome.runtime.sendMessage({ type: 'SYNC_USAGE_BACKGROUND_TAB' }, (res) => {
+      // タイムアウト解除用
+      setTimeout(() => {
+        this.isFetching = false;
+        this.updateUI();
+      }, 5500);
+    });
+  }
 
-    // 既存の取得用iframeがあれば削除
-    const oldIframe = document.getElementById('g-ext-usage-bg-frame');
-    if (oldIframe) oldIframe.remove();
+  /**
+   * 自身が /usage ページの場合にDOMから抽出し、Service Workerへタブ終了を通知
+   */
+  checkIfDirectlyOnUsagePage() {
+    if (window.location.pathname.startsWith('/usage') || window.location.href.includes('/usage')) {
+      console.log('[Gemini Extended Suite] On official /usage page. Starting extraction...');
 
-    const iframe = document.createElement('iframe');
-    iframe.id = 'g-ext-usage-bg-frame';
-    iframe.style.cssText = 'position: absolute; width: 0; height: 0; border: none; opacity: 0; pointer-events: none; left: -9999px;';
-    iframe.src = 'https://gemini.google.com/usage';
+      let hasSynced = false;
 
-    let hasExtracted = false;
+      const tryScrape = () => {
+        if (hasSynced) return;
 
-    const extractFromIframe = () => {
-      if (hasExtracted) return;
-
-      try {
-        const frameDoc = iframe.contentDocument || iframe.contentWindow?.document;
-        if (!frameDoc || !frameDoc.body) return;
-
-        const text = frameDoc.body.innerText || '';
-        if (!text.includes('現在の使用量') && !text.includes('使用量上限')) {
-          return; // まだSPAの描画中
-        }
+        const text = document.body.innerText || '';
+        if (!text.includes('現在の使用量') && !text.includes('使用量上限')) return;
 
         const currentMatch = text.match(/現在の使用量[^\d]*(\d+)%\s*使用中/);
         const resetMatch = text.match(/(\d{1,2}:\d{2}\s*にリセット)/);
@@ -245,9 +247,9 @@ class UsageMonitorModule {
         const weeklyResetMatch = text.match(/(\d+月\d+日の\d{1,2}:\d{2}\s*にリセットされます|\d+月\d+日[^\n]*リセット)/);
 
         if (currentMatch) {
-          hasExtracted = true;
-          const nowDate = new Date();
-          const timeStr = `${nowDate.getHours()}:${String(nowDate.getMinutes()).padStart(2, '0')}`;
+          hasSynced = true;
+          const now = new Date();
+          const timeStr = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
 
           const data = {
             currentUsage: `${currentMatch[1]}% 使用中`,
@@ -260,68 +262,18 @@ class UsageMonitorModule {
           };
 
           this.officialData = data;
-          chrome.storage.local.set({ geminiOfficialQuota: data });
-          this.isFetching = false;
-          this.updateUI();
-
-          console.log('[Gemini Extended Suite] ✅ Background usage sync succeeded:', data);
-
-          // 完了したので直ちに iframe を破棄
-          setTimeout(() => iframe.remove(), 200);
-        }
-      } catch (err) {
-        console.warn('[Gemini Extended Suite] Background iframe extraction error:', err);
-      }
-    };
-
-    iframe.onload = () => {
-      // SPAの描画完了を待機して抽出試行
-      setTimeout(extractFromIframe, 800);
-      setTimeout(extractFromIframe, 1800);
-      setTimeout(extractFromIframe, 3000);
-    };
-
-    document.body.appendChild(iframe);
-
-    // 最大6秒で安全にクリーンアップ
-    setTimeout(() => {
-      this.isFetching = false;
-      this.updateUI();
-      if (document.getElementById('g-ext-usage-bg-frame')) {
-        document.getElementById('g-ext-usage-bg-frame').remove();
-      }
-    }, 6000);
-  }
-
-  checkIfDirectlyOnUsagePage() {
-    if (window.location.pathname.startsWith('/usage')) {
-      const tryScrape = () => {
-        const text = document.body.innerText || '';
-        const currentMatch = text.match(/現在の使用量[^\d]*(\d+)%\s*使用中/);
-        const resetMatch = text.match(/(\d{1,2}:\d{2}\s*にリセット)/);
-        const weeklyMatch = text.match(/1\s*週間の上限[^\d]*(\d+)%\s*使用中/);
-        const weeklyResetMatch = text.match(/(\d+月\d+日の\d{1,2}:\d{2}\s*にリセットされます|\d+月\d+日[^\n]*リセット)/);
-
-        if (currentMatch) {
-          const now = new Date();
-          const timeStr = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
-          const data = {
-            currentUsage: `${currentMatch[1]}% 使用中`,
-            currentPercent: parseInt(currentMatch[1], 10),
-            resetTime: resetMatch ? resetMatch[1] : '',
-            weeklyUsage: weeklyMatch ? `${weeklyMatch[1]}% 使用中` : '',
-            weeklyPercent: weeklyMatch ? parseInt(weeklyMatch[1], 10) : 0,
-            weeklyReset: weeklyResetMatch ? weeklyResetMatch[1] : '',
-            lastSynced: timeStr
-          };
-          this.officialData = data;
-          chrome.storage.local.set({ geminiOfficialQuota: data });
-          this.updateUI();
+          chrome.storage.local.set({ geminiOfficialQuota: data }, () => {
+            console.log('[Gemini Extended Suite] ✅ Saved official /usage data to storage:', data);
+            
+            // Service Workerに裏タブの終了を通知
+            chrome.runtime.sendMessage({ type: 'USAGE_SYNC_COMPLETE' });
+          });
         }
       };
 
-      setTimeout(tryScrape, 1000);
-      setTimeout(tryScrape, 2500);
+      setTimeout(tryScrape, 800);
+      setTimeout(tryScrape, 1800);
+      setTimeout(tryScrape, 3200);
     }
   }
 
