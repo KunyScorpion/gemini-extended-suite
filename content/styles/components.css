@@ -433,6 +433,38 @@
   user-select: none;
 }
 
+/* Gemini返答フッター用 ひっそり文字数カウンター行（ボタン群の一段下にすっきり配置） */
+.g-ext-response-char-counter-row {
+  display: flex;
+  align-items: center;
+  margin-top: 2px;
+  margin-bottom: 6px;
+  padding-left: 6px;
+  user-select: none;
+  pointer-events: auto;
+}
+
+.g-ext-response-char-counter {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-family: var(--g-ext-font-mono);
+  color: var(--g-ext-text-muted);
+  opacity: 0.65;
+  user-select: none;
+  cursor: default;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  transition: opacity var(--g-ext-transition-fast), color var(--g-ext-transition-fast);
+}
+
+.g-ext-response-char-counter:hover {
+  opacity: 1;
+  color: var(--g-ext-text);
+}
+
+
 .g-ext-toc-container {
   position: fixed;
   right: 16px;

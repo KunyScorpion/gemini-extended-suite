@@ -45,6 +45,17 @@
       window.chatEnhancerModule.checkAndMount();
     }
 
+    if (changes.enableCharCount !== undefined && window.chatEnhancerModule) {
+      window.chatEnhancerModule.enableCharCount = changes.enableCharCount.newValue;
+      if (!window.chatEnhancerModule.enableCharCount) {
+        const counter = document.getElementById(window.chatEnhancerModule.charCounterId);
+        if (counter) counter.remove();
+        window.chatEnhancerModule.removeResponseCharCounters();
+      } else {
+        window.chatEnhancerModule.checkAndMount();
+      }
+    }
+
     if (changes.fullWidthMode !== undefined && window.chatEnhancerModule) {
       window.chatEnhancerModule.applyFullWidth(changes.fullWidthMode.newValue);
     }
