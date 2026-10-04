@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini Extended Suite</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="popup-header">
+    <div class="brand">
+      <img src="../icons/icon-48.png" alt="Icon" class="brand-icon">
+      <div>
+        <div class="brand-title">Gemini Extended Suite</div>
+        <div class="brand-sub">Post-2026/10 Architecture v1.0.0</div>
+      </div>
+    </div>
+  </header>
+
+  <nav class="popup-tabs">
+    <button type="button" class="tab-btn active" data-tab="features">機能設定</button>
+    <button type="button" class="tab-btn" data-tab="skills">スキル管理</button>
+    <button type="button" class="tab-btn" data-tab="backup">バックアップ</button>
+    <button type="button" class="tab-btn" data-tab="shortcuts">ヘルプ</button>
+  </nav>
+
+  <!-- タブ 1: 機能設定 -->
+  <main class="tab-content active" id="tab-features">
+    <section class="setting-group">
+      <div class="group-title">メイン拡張モジュール</div>
+
+      <label class="toggle-row">
+        <span>⚡ モデル選択ワンタッチバー</span>
+        <input type="checkbox" id="toggle-model-switcher" checked>
+        <span class="switch"></span>
+      </label>
+
+      <label class="toggle-row">
+        <span>⚡ スキル / タスク ランチャー</span>
+        <input type="checkbox" id="toggle-skill-launcher" checked>
+        <span class="switch"></span>
+      </label>
+
+      <label class="toggle-row">
+        <span>📁 サイドバー フォルダ＆一括リネーム</span>
+        <input type="checkbox" id="toggle-sidebar-folders" checked>
+        <span class="switch"></span>
+      </label>
+
+      <label class="toggle-row">
+        <span>📥 チャット全文 Markdownエクスポート</span>
+        <input type="checkbox" id="toggle-markdown-export" checked>
+        <span class="switch"></span>
+      </label>
+
+      <label class="toggle-row">
+        <span>📊 使用量・クォータ常時インジケーター</span>
+        <input type="checkbox" id="toggle-usage-monitor" checked>
+        <span class="switch"></span>
+      </label>
+    </section>
+
+    <section class="setting-group">
+      <div class="group-title">エディタ・UI快適化</div>
+
+      <label class="toggle-row">
+        <span>⤢ ワイド表示モード (Full-Width)</span>
+        <input type="checkbox" id="toggle-full-width">
+        <span class="switch"></span>
+      </label>
+
+      <label class="toggle-row">
+        <span>🔢 入力文字数・行数カウンター</span>
+        <input type="checkbox" id="toggle-char-count" checked>
+        <span class="switch"></span>
+      </label>
+
+      <label class="toggle-row">
+        <span>📑 チャット内目次 (Jump to Turn)</span>
+        <input type="checkbox" id="toggle-toc" checked>
+        <span class="switch"></span>
+      </label>
+
+      <label class="toggle-row">
+        <span>🔔 AI回答完了デスクトップ通知</span>
+        <input type="checkbox" id="toggle-notifications" checked>
+        <span class="switch"></span>
+      </label>
+    </section>
+  </main>
+
+  <!-- タブ 2: スキル管理 -->
+  <main class="tab-content" id="tab-skills">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-size:12px;font-weight:700;">登録済みスキル一覧</span>
+      <button type="button" class="btn btn-sm btn-primary" id="btn-add-skill">+ 追加</button>
+    </div>
+    <div class="skill-list" id="popup-skill-list">
+      <!-- JSで動的生成 -->
+    </div>
+  </main>
+
+  <!-- タブ 3: バックアップ -->
+  <main class="tab-content" id="tab-backup">
+    <div class="setting-group">
+      <div class="group-title">フォルダ・設定データの保存</div>
+      <p style="font-size:11px;color:#94a3b8;margin-bottom:12px;">
+        作成したフォルダ構造や登録スキルをJSONファイルとして書き出し・読み込みできます。
+      </p>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn btn-primary" style="flex:1;" id="btn-export-backup">JSONエクスポート</button>
+        <button type="button" class="btn btn-secondary" style="flex:1;" id="btn-import-trigger">JSONインポート</button>
+        <input type="file" id="file-import-input" accept=".json" style="display:none;">
+      </div>
+      <div id="backup-status" style="font-size:11px;margin-top:8px;color:#10b981;"></div>
+    </div>
+  </main>
+
+  <!-- タブ 4: ショートカット・ヘルプ -->
+  <main class="tab-content" id="tab-shortcuts">
+    <div class="shortcut-list">
+      <div class="shortcut-item">
+        <span class="shortcut-key">/</span>
+        <span class="shortcut-desc">入力欄でスキル選択ポップアップ表示</span>
+      </div>
+      <div class="shortcut-item">
+        <span class="shortcut-key">↑ / ↓</span>
+        <span class="shortcut-desc">スキル候補リストの移動</span>
+      </div>
+      <div class="shortcut-item">
+        <span class="shortcut-key">Enter</span>
+        <span class="shortcut-desc">選択スキルの即時挿入</span>
+      </div>
+      <div class="shortcut-item">
+        <span class="shortcut-key">D&D</span>
+        <span class="shortcut-desc">スレッドをフォルダへドラッグ＆ドロップ分類</span>
+      </div>
+    </div>
+  </main>
+
+  <footer class="popup-footer">
+    <span>Gemini Extended Suite © 2026</span>
+    <a href="https://gemini.google.com" target="_blank" style="color:var(--g-ext-primary);text-decoration:none;">Gemini Webを開く</a>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+/**
+ * Gemini Extended Suite - main.css
+ * 変数定義、ダーク/ライトモード対応、ユーティリティ
+ */
+
+:root {
+  --g-ext-primary: #4f80ff;
+  --g-ext-primary-hover: #6a95ff;
+  --g-ext-primary-glow: rgba(79, 128, 255, 0.35);
+  
+  --g-ext-accent: #a855f7;
+  --g-ext-accent-hover: #bd73fa;
+  --g-ext-accent-glow: rgba(168, 85, 247, 0.35);
+
+  --g-ext-success: #10b981;
+  --g-ext-warning: #f59e0b;
+  --g-ext-danger: #ef4444;
+
+  --g-ext-bg-dark: #13161f;
+  --g-ext-surface-dark: #1e2230;
+  --g-ext-surface-hover-dark: #272d3f;
+  --g-ext-border-dark: rgba(255, 255, 255, 0.12);
+  --g-ext-text-dark: #f1f5f9;
+  --g-ext-text-muted-dark: #94a3b8;
+
+  --g-ext-bg-light: #ffffff;
+  --g-ext-surface-light: #f8fafc;
+  --g-ext-surface-hover-light: #eef2f6;
+  --g-ext-border-light: rgba(0, 0, 0, 0.1);
+  --g-ext-text-light: #0f172a;
+  --g-ext-text-muted-light: #64748b;
+
+  --g-ext-radius-sm: 6px;
+  --g-ext-radius-md: 10px;
+  --g-ext-radius-lg: 14px;
+  --g-ext-radius-pill: 9999px;
+
+  --g-ext-transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --g-ext-transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+  --g-ext-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --g-ext-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Geminiがダークテーマの場合（prefers-color-schemeまたは公式属性に連動） */
+body, [data-theme="dark"], .dark-theme {
+  --g-ext-bg: var(--g-ext-bg-dark);
+  --g-ext-surface: var(--g-ext-surface-dark);
+  --g-ext-surface-hover: var(--g-ext-surface-hover-dark);
+  --g-ext-border: var(--g-ext-border-dark);
+  --g-ext-text: var(--g-ext-text-dark);
+  --g-ext-text-muted: var(--g-ext-text-muted-dark);
+  --g-ext-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* ライトモード */
+body:not([data-theme="dark"]):not(.dark-theme) {
+  --g-ext-bg: var(--g-ext-bg-light);
+  --g-ext-surface: var(--g-ext-surface-light);
+  --g-ext-surface-hover: var(--g-ext-surface-hover-light);
+  --g-ext-border: var(--g-ext-border-light);
+  --g-ext-text: var(--g-ext-text-light);
+  --g-ext-text-muted: var(--g-ext-text-muted-light);
+  --g-ext-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* アニメーション定義 */
+@keyframes g-ext-fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes g-ext-scaleUp {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes g-ext-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}

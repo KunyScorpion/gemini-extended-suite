@@ -1,0 +1,648 @@
+/**
+ * Gemini Extended Suite - components.css
+ * 拡張機能独自のUIコンポーネント（g-ext-* プレフィックス）
+ */
+
+/* ==========================================================================
+   Feature 1: モデル選択ワンタッチバー
+   ========================================================================== */
+.g-ext-model-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  margin-bottom: 6px;
+  background: var(--g-ext-surface);
+  border: 1px solid var(--g-ext-border);
+  border-radius: var(--g-ext-radius-pill);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  animation: g-ext-fadeIn var(--g-ext-transition-fast) ease-out;
+  z-index: 100;
+}
+.g-ext-model-bar-container::-webkit-scrollbar {
+  display: none;
+}
+
+.g-ext-model-bar-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--g-ext-text-muted);
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.g-ext-model-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--g-ext-radius-pill);
+  border: 1px solid var(--g-ext-border);
+  background: var(--g-ext-bg);
+  color: var(--g-ext-text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--g-ext-transition-fast);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.g-ext-model-pill:hover {
+  background: var(--g-ext-surface-hover);
+  border-color: var(--g-ext-primary);
+  transform: translateY(-1px);
+}
+
+.g-ext-model-pill.active {
+  background: linear-gradient(135deg, var(--g-ext-primary), var(--g-ext-accent));
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 0 12px var(--g-ext-primary-glow);
+}
+
+.g-ext-model-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--g-ext-text-muted);
+  transition: background var(--g-ext-transition-fast);
+}
+
+.g-ext-model-pill.active .g-ext-model-pill-dot {
+  background: #ffffff;
+  box-shadow: 0 0 6px #ffffff;
+}
+
+/* ==========================================================================
+   Feature 2: スキル・タスク コマンドランチャー
+   ========================================================================== */
+.g-ext-skill-launcher-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.g-ext-skill-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--g-ext-radius-md);
+  border: 1px solid var(--g-ext-primary);
+  background: transparent;
+  color: var(--g-ext-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--g-ext-transition-fast);
+}
+
+.g-ext-skill-toggle-btn:hover {
+  background: var(--g-ext-primary-glow);
+  color: #ffffff;
+}
+
+.g-ext-skill-palette {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: 320px;
+  background: var(--g-ext-surface);
+  border: 1px solid var(--g-ext-border);
+  border-radius: var(--g-ext-radius-lg);
+  box-shadow: var(--g-ext-shadow);
+  padding: 8px;
+  z-index: 1000;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  backdrop-filter: blur(12px);
+  animation: g-ext-scaleUp 0.18s ease-out;
+}
+
+.g-ext-skill-palette.open {
+  display: flex;
+}
+
+.g-ext-skill-palette-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--g-ext-text);
+  border-bottom: 1px solid var(--g-ext-border);
+  margin-bottom: 4px;
+}
+
+.g-ext-skill-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--g-ext-radius-sm);
+  cursor: pointer;
+  transition: background var(--g-ext-transition-fast);
+  text-align: left;
+}
+
+.g-ext-skill-item:hover, .g-ext-skill-item.selected {
+  background: var(--g-ext-surface-hover);
+}
+
+.g-ext-skill-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.g-ext-skill-content {
+  flex: 1;
+}
+
+.g-ext-skill-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--g-ext-text);
+}
+
+.g-ext-skill-cmd {
+  font-size: 11px;
+  color: var(--g-ext-primary);
+  font-family: var(--g-ext-font-mono);
+  margin-top: 2px;
+}
+
+.g-ext-skill-desc {
+  font-size: 11px;
+  color: var(--g-ext-text-muted);
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+/* スラッシュコマンド・インライン候補 */
+.g-ext-slash-popup {
+  position: absolute;
+  width: 300px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--g-ext-surface);
+  border: 1px solid var(--g-ext-primary);
+  border-radius: var(--g-ext-radius-md);
+  box-shadow: var(--g-ext-shadow);
+  padding: 6px;
+  z-index: 1050;
+  display: none;
+}
+.g-ext-slash-popup.active {
+  display: block;
+}
+
+/* ==========================================================================
+   Feature 3: サイドバーのフォルダ管理 ＆ ハイブリッド一括リネーム
+   ========================================================================== */
+.g-ext-folder-section {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--g-ext-border);
+  margin-bottom: 8px;
+}
+
+.g-ext-folder-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.g-ext-folder-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--g-ext-text-muted);
+}
+
+.g-ext-add-folder-btn {
+  background: none;
+  border: 1px dashed var(--g-ext-border);
+  color: var(--g-ext-text);
+  padding: 3px 8px;
+  border-radius: var(--g-ext-radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--g-ext-transition-fast);
+}
+
+.g-ext-add-folder-btn:hover {
+  border-color: var(--g-ext-primary);
+  color: var(--g-ext-primary);
+  background: var(--g-ext-surface-hover);
+}
+
+.g-ext-folder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.g-ext-folder-node {
+  border-radius: var(--g-ext-radius-sm);
+  overflow: hidden;
+}
+
+.g-ext-folder-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--g-ext-surface);
+  border-radius: var(--g-ext-radius-sm);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--g-ext-transition-fast);
+}
+
+.g-ext-folder-header:hover {
+  background: var(--g-ext-surface-hover);
+}
+
+.g-ext-folder-header.drag-over {
+  outline: 2px dashed var(--g-ext-primary);
+  background: var(--g-ext-primary-glow);
+}
+
+.g-ext-folder-toggle-icon {
+  font-size: 10px;
+  transition: transform var(--g-ext-transition-fast);
+}
+.g-ext-folder-node.collapsed .g-ext-folder-toggle-icon {
+  transform: rotate(-90deg);
+}
+
+.g-ext-folder-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--g-ext-text);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.g-ext-folder-count {
+  font-size: 11px;
+  color: var(--g-ext-text-muted);
+  background: rgba(125, 125, 125, 0.15);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.g-ext-folder-action-btn {
+  background: none;
+  border: none;
+  color: var(--g-ext-text-muted);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 12px;
+  opacity: 0.6;
+  border-radius: 4px;
+}
+.g-ext-folder-action-btn:hover {
+  opacity: 1;
+  background: var(--g-ext-surface-hover);
+}
+
+.g-ext-folder-contents {
+  padding-left: 12px;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.g-ext-folder-node.collapsed .g-ext-folder-contents {
+  display: none;
+}
+
+/* ==========================================================================
+   共通モーダル（ハイブリッド一括リネーム、フォルダ編集等）
+   ========================================================================== */
+.g-ext-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: g-ext-fadeIn 0.15s ease-out;
+}
+
+.g-ext-modal {
+  width: 90%;
+  max-width: 520px;
+  background: var(--g-ext-surface);
+  border: 1px solid var(--g-ext-border);
+  border-radius: var(--g-ext-radius-lg);
+  box-shadow: var(--g-ext-shadow);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: g-ext-scaleUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.g-ext-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.g-ext-modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--g-ext-text);
+}
+
+.g-ext-modal-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: var(--g-ext-text-muted);
+  cursor: pointer;
+}
+
+.g-ext-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.g-ext-modal-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--g-ext-text-muted);
+}
+
+.g-ext-input {
+  background: var(--g-ext-bg);
+  border: 1px solid var(--g-ext-border);
+  border-radius: var(--g-ext-radius-md);
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--g-ext-text);
+  outline: none;
+  transition: border-color var(--g-ext-transition-fast);
+}
+
+.g-ext-input:focus {
+  border-color: var(--g-ext-primary);
+  box-shadow: 0 0 0 2px var(--g-ext-primary-glow);
+}
+
+.g-ext-thread-checklist {
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--g-ext-border);
+  border-radius: var(--g-ext-radius-sm);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--g-ext-bg);
+}
+
+.g-ext-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--g-ext-text);
+  cursor: pointer;
+}
+
+.g-ext-progress-bar-wrap {
+  width: 100%;
+  height: 8px;
+  background: var(--g-ext-border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.g-ext-progress-bar-inner {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--g-ext-primary), var(--g-ext-accent));
+  transition: width 0.3s ease;
+}
+
+.g-ext-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.g-ext-btn {
+  padding: 8px 16px;
+  border-radius: var(--g-ext-radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all var(--g-ext-transition-fast);
+}
+
+.g-ext-btn-secondary {
+  background: var(--g-ext-surface-hover);
+  color: var(--g-ext-text);
+}
+
+.g-ext-btn-primary {
+  background: var(--g-ext-primary);
+  color: #ffffff;
+}
+.g-ext-btn-primary:hover {
+  background: var(--g-ext-primary-hover);
+}
+
+/* ==========================================================================
+   Feature 4: チャット全文のMarkdownエクスポート
+   ========================================================================== */
+.g-ext-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: var(--g-ext-radius-pill);
+  background: var(--g-ext-surface);
+  border: 1px solid var(--g-ext-border);
+  color: var(--g-ext-text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--g-ext-transition-fast);
+}
+
+.g-ext-export-btn:hover {
+  background: var(--g-ext-surface-hover);
+  border-color: var(--g-ext-primary);
+  color: var(--g-ext-primary);
+}
+
+/* ==========================================================================
+   Feature 5: 使用量・クォータ常時インジケーター
+   ========================================================================== */
+.g-ext-usage-indicator {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: var(--g-ext-radius-pill);
+  background: var(--g-ext-surface);
+  border: 1px solid var(--g-ext-border);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--g-ext-text);
+  user-select: none;
+}
+
+.g-ext-usage-meter {
+  width: 44px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--g-ext-border);
+  overflow: hidden;
+}
+
+.g-ext-usage-meter-bar {
+  height: 100%;
+  width: 100%;
+  border-radius: 3px;
+  background: var(--g-ext-success);
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+.g-ext-usage-meter-bar.warning {
+  background: var(--g-ext-warning);
+}
+
+.g-ext-usage-meter-bar.danger {
+  background: var(--g-ext-danger);
+}
+
+.g-ext-usage-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 240px;
+  background: var(--g-ext-surface);
+  border: 1px solid var(--g-ext-border);
+  border-radius: var(--g-ext-radius-md);
+  box-shadow: var(--g-ext-shadow);
+  padding: 12px;
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+}
+.g-ext-usage-popover.open {
+  display: flex;
+}
+
+/* ==========================================================================
+   Feature 6: Chat Enhancer（目次、文字数カウンター、ワイド表示）
+   ========================================================================== */
+/* 入力文字数カウンター */
+.g-ext-char-counter {
+  font-size: 11px;
+  font-family: var(--g-ext-font-mono);
+  color: var(--g-ext-text-muted);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.05);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+
+/* 右端フローティング目次 (TOC) */
+.g-ext-toc-container {
+  position: fixed;
+  right: 16px;
+  top: 80px;
+  width: 220px;
+  max-height: 70vh;
+  background: var(--g-ext-surface);
+  border: 1px solid var(--g-ext-border);
+  border-radius: var(--g-ext-radius-md);
+  box-shadow: var(--g-ext-shadow);
+  display: flex;
+  flex-direction: column;
+  z-index: 990;
+  transition: transform var(--g-ext-transition-fast), width var(--g-ext-transition-fast);
+  backdrop-filter: blur(10px);
+}
+
+.g-ext-toc-container.collapsed {
+  width: 38px;
+}
+
+.g-ext-toc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--g-ext-border);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--g-ext-text);
+  cursor: pointer;
+}
+
+.g-ext-toc-container.collapsed .g-ext-toc-header span:first-child {
+  display: none;
+}
+
+.g-ext-toc-list {
+  padding: 6px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.g-ext-toc-container.collapsed .g-ext-toc-list {
+  display: none;
+}
+
+.g-ext-toc-item {
+  font-size: 11px;
+  color: var(--g-ext-text-muted);
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: all var(--g-ext-transition-fast);
+}
+
+.g-ext-toc-item:hover {
+  background: var(--g-ext-surface-hover);
+  color: var(--g-ext-primary);
+}

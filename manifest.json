@@ -1,0 +1,65 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini Extended Suite",
+  "version": "1.0.0",
+  "description": "Gemini Web UI向けオールインワン作業支援ブラウザ拡張機能（フォルダ整理、一括リネーム、モデル選択、スキルランチャー、MDエクスポート、目次・文字数等）",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    },
+    "default_title": "Gemini Extended Suite 設定"
+  },
+  "background": {
+    "service_worker": "background/service_worker.js"
+  },
+  "permissions": [
+    "storage",
+    "notifications",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://gemini.google.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://gemini.google.com/*"
+      ],
+      "css": [
+        "content/styles/main.css",
+        "content/styles/components.css",
+        "content/styles/injected_theme.css"
+      ],
+      "js": [
+        "content/dom_observer.js",
+        "content/modules/model_switcher.js",
+        "content/modules/skill_launcher.js",
+        "content/modules/sidebar_folders.js",
+        "content/modules/exporter_md.js",
+        "content/modules/usage_monitor.js",
+        "content/modules/chat_enhancer.js",
+        "content/content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/*",
+        "content/styles/*"
+      ],
+      "matches": [
+        "https://gemini.google.com/*"
+      ]
+    }
+  ]
+}
