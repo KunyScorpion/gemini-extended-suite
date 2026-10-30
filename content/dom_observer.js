@@ -25,6 +25,7 @@ class GeminiDomObserver {
     setTimeout(() => this.notifyModules(), 200);
     setTimeout(() => this.notifyModules(), 600);
     setTimeout(() => this.notifyModules(), 1500);
+    setTimeout(() => this.notifyModules(), 3000);
   }
 
   registerModule(name, moduleInstance) {
@@ -77,6 +78,15 @@ class GeminiDomObserver {
     window.addEventListener('popstate', handleUrlChange);
   }
 
+  _isExtensionNode(node) {
+    if (!node) return false;
+    const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+    if (!el) return false;
+    if (typeof el.id === 'string' && el.id.startsWith('g-ext-')) return true;
+    if (typeof el.className === 'string' && el.className.includes('g-ext-')) return true;
+    return !!el.closest?.('[class*="g-ext-"], [id^="g-ext-"]');
+  }
+
   _setupMutationObserver() {
     const targetNode = document.body || document.documentElement;
 
@@ -84,9 +94,19 @@ class GeminiDomObserver {
       // 拡張機能自身のUI変更のみの場合は無視（無限ループを完全防止）
       let hasExternalChange = false;
       for (const m of mutations) {
-        if (m.target && m.target.className && typeof m.target.className === 'string' && m.target.className.includes('g-ext-')) {
+        if (this._isExtensionNode(m.target)) {
           continue;
         }
+
+        // ターゲットがGemini側の親要素であっても、追加・削除されたノードがすべて拡張機能の要素なら無視
+        const changedNodes = [
+          ...Array.from(m.addedNodes || []),
+          ...Array.from(m.removedNodes || [])
+        ];
+        if (changedNodes.length > 0 && changedNodes.every(n => this._isExtensionNode(n))) {
+          continue;
+        }
+
         hasExternalChange = true;
         break;
       }

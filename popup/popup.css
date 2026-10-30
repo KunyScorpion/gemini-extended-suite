@@ -156,38 +156,6 @@ input:checked + .switch::before {
   transform: translateX(16px);
 }
 
-.skill-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.skill-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
-  background: var(--g-ext-surface);
-  border: 1px solid var(--g-ext-border);
-  border-radius: 8px;
-}
-
-.skill-card-info {
-  flex: 1;
-  overflow: hidden;
-}
-
-.skill-card-name {
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.skill-card-cmd {
-  font-size: 10px;
-  color: var(--g-ext-primary);
-  font-family: monospace;
-}
-
 .btn {
   padding: 6px 12px;
   border-radius: 6px;

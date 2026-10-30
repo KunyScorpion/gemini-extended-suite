@@ -11,6 +11,8 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     enableMarkdownExport: true,
     enableUsageMonitor: true,
     enableChatEnhancer: true,
+    enableThinkingSelector: true,
+    enableSkillLauncher: true,
     
     fullWidthMode: false,
     enableCharCount: true,

@@ -18,6 +18,20 @@ class ChatEnhancerModule {
     this.isGenerating = false;
     this.generationCheckInterval = null;
     this.lastTocSignature = ''; // フリッカー防止用のDOMシグネチャ
+    this.isInputListenerBound = false; // inputイベントリスナー多重登録防止フラグ
+  }
+
+  /**
+   * XSSおよびDOM構造破損を防ぐためのHTMLエスケープ処理
+   */
+  escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   async init() {
@@ -90,6 +104,24 @@ class ChatEnhancerModule {
 
   mountCharCounter() {
     if (!this.enableCharCount) return;
+
+    if (!this.isInputListenerBound) {
+      this.isInputListenerBound = true;
+      document.addEventListener('input', (e) => {
+        const counterEl = document.getElementById(this.charCounterId);
+        if (!counterEl) return;
+
+        const target = e.target;
+        if (!target || (!target.isContentEditable && target.tagName !== 'TEXTAREA')) return;
+
+        const text = target.isContentEditable ? target.innerText : target.value;
+        const charCount = text ? text.replace(/\n$/, '').length : 0;
+        const lineCount = text && charCount > 0 ? text.split('\n').length : 1;
+
+        counterEl.textContent = `${charCount.toLocaleString()} 字 | ${lineCount.toLocaleString()} 行`;
+      });
+    }
+
     if (document.getElementById(this.charCounterId)) return;
 
     const inputWrap = document.querySelector('.chat-input-container, rich-textarea, form[class*="query"]');
@@ -98,21 +130,10 @@ class ChatEnhancerModule {
     const counter = document.createElement('div');
     counter.id = this.charCounterId;
     counter.className = 'g-ext-char-counter';
-    counter.innerHTML = `0 字 | 1 行`;
+    counter.textContent = `0 字 | 1 行`;
 
     const targetParent = inputWrap.parentElement || inputWrap;
     targetParent.appendChild(counter);
-
-    document.addEventListener('input', (e) => {
-      const target = e.target;
-      if (!target || (!target.isContentEditable && target.tagName !== 'TEXTAREA')) return;
-
-      const text = target.isContentEditable ? target.innerText : target.value;
-      const charCount = text ? text.replace(/\n$/, '').length : 0;
-      const lineCount = text && charCount > 0 ? text.split('\n').length : 1;
-
-      counter.innerHTML = `${charCount.toLocaleString()} 字 | ${lineCount.toLocaleString()} 行`;
-    });
   }
 
   /* ---------------------------------------------------------
@@ -303,10 +324,11 @@ class ChatEnhancerModule {
 
     uniqueTurns.forEach((turn, idx) => {
       const preview = turn.text.length > 20 ? turn.text.slice(0, 20) + '…' : turn.text;
+      const safePreview = this.escapeHtml(preview);
 
       const item = document.createElement('div');
       item.className = 'g-ext-toc-item';
-      item.innerHTML = `<span style="color:var(--g-ext-primary);font-weight:700;margin-right:4px;">#${idx + 1}</span><span>${preview}</span>`;
+      item.innerHTML = `<span style="color:var(--g-ext-primary);font-weight:700;margin-right:4px;">#${idx + 1}</span><span>${safePreview}</span>`;
       item.title = turn.text;
 
       item.addEventListener('click', (e) => {

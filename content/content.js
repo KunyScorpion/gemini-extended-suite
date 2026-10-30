@@ -4,7 +4,7 @@
  */
 
 (function () {
-  console.log('[Gemini Extended Suite] v1.3.0 initializing on Gemini Web...');
+  console.log('[Gemini Extended Suite] v1.5.0 initializing on Gemini Web...');
 
   function bootstrap() {
     if (window.geminiDomObserver) {
@@ -45,6 +45,16 @@
       window.chatEnhancerModule.checkAndMount();
     }
 
+    if (changes.enableThinkingSelector && window.thinkingSelectorModule) {
+      window.thinkingSelectorModule.enabled = changes.enableThinkingSelector.newValue;
+      window.thinkingSelectorModule.checkAndMount();
+    }
+
+    if (changes.enableSkillLauncher !== undefined && window.skillLauncherModule) {
+      window.skillLauncherModule.enabled = changes.enableSkillLauncher.newValue;
+      window.skillLauncherModule.checkAndMount();
+    }
+
     if (changes.enableCharCount !== undefined && window.chatEnhancerModule) {
       window.chatEnhancerModule.enableCharCount = changes.enableCharCount.newValue;
       if (!window.chatEnhancerModule.enableCharCount) {
@@ -54,6 +64,20 @@
       } else {
         window.chatEnhancerModule.checkAndMount();
       }
+    }
+
+    if (changes.enableTableOfContents !== undefined && window.chatEnhancerModule) {
+      window.chatEnhancerModule.enableToc = changes.enableTableOfContents.newValue;
+      if (!window.chatEnhancerModule.enableToc) {
+        const toc = document.getElementById(window.chatEnhancerModule.tocContainerId);
+        if (toc) toc.remove();
+      } else {
+        window.chatEnhancerModule.checkAndMount();
+      }
+    }
+
+    if (changes.enableDesktopNotifications !== undefined && window.chatEnhancerModule) {
+      window.chatEnhancerModule.enableNotification = changes.enableDesktopNotifications.newValue;
     }
 
     if (changes.fullWidthMode !== undefined && window.chatEnhancerModule) {

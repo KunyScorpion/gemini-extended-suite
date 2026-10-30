@@ -30,9 +30,3 @@ body.g-ext-full-width-enabled [class*="user-query"] {
   width: 100%;
   padding: 4px 8px;
 }
-
-/* スレッドリスト項目のドラッグ状態スタイル */
-.g-ext-thread-dragging {
-  opacity: 0.4;
-  transform: scale(0.98);
-}

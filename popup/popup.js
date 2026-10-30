@@ -24,6 +24,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     { id: 'toggle-sidebar-folders', key: 'enableSidebarFolders' },
     { id: 'toggle-markdown-export', key: 'enableMarkdownExport' },
     { id: 'toggle-usage-monitor', key: 'enableUsageMonitor' },
+    { id: 'toggle-thinking-selector', key: 'enableThinkingSelector' },
+    { id: 'toggle-skill-launcher', key: 'enableSkillLauncher' },
     { id: 'toggle-full-width', key: 'fullWidthMode' },
     { id: 'toggle-char-count', key: 'enableCharCount' },
     { id: 'toggle-toc', key: 'enableTableOfContents' },

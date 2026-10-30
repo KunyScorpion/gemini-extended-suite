@@ -12,6 +12,19 @@ class SidebarFoldersModule {
     this.enabled = true;
   }
 
+  /**
+   * XSSおよびDOM構造破損を防ぐためのHTMLエスケープ処理
+   */
+  escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   async init() {
     const data = await chrome.storage.local.get(['enableSidebarFolders', 'folders', 'threadTitles']);
     this.enabled = data.enableSidebarFolders !== false;
@@ -216,10 +229,13 @@ class SidebarFoldersModule {
       header.className = 'g-ext-folder-header';
       header.style.borderLeft = `3px solid ${folder.color || 'var(--g-ext-primary)'}`;
 
+      const safeIcon = this.escapeHtml(folder.icon || '📁');
+      const safeName = this.escapeHtml(folder.name);
+
       header.innerHTML = `
         <span class="g-ext-folder-toggle-icon">▼</span>
-        <span style="font-size:14px;">${folder.icon || '📁'}</span>
-        <span class="g-ext-folder-name" title="${folder.name}">${folder.name}</span>
+        <span style="font-size:14px;">${safeIcon}</span>
+        <span class="g-ext-folder-name" title="${safeName}">${safeName}</span>
         <span class="g-ext-folder-count">${(folder.threadIds || []).length}</span>
         <button type="button" class="g-ext-folder-action-btn" title="フォルダ設定・編集" data-action="settings">⚙️</button>
       `;
@@ -252,9 +268,10 @@ class SidebarFoldersModule {
 
         // 1. DOMから取得、2. 永続ストレージから取得、3. フォールバック
         const realTitle = this.findThreadTitle(tId);
+        const safeRealTitle = this.escapeHtml(realTitle);
 
         item.innerHTML = `
-          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${realTitle}">📄 ${realTitle}</span>
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${safeRealTitle}">📄 ${safeRealTitle}</span>
           <span style="opacity:0.5;padding:0 4px;" title="フォルダから除外">✕</span>
         `;
 
@@ -277,20 +294,30 @@ class SidebarFoldersModule {
   }
 
   /**
+   * スレッドのリンク要素からクリーンなタイトル文字列を抽出（ボタン等の絵文字ノイズを除外）
+   */
+  extractTitleFromLink(link) {
+    if (!link) return null;
+    const clone = link.cloneNode(true);
+    clone.querySelectorAll('.g-ext-quick-folder-btn, [class*="g-ext-"], button, mat-icon, svg').forEach(el => el.remove());
+    const titleSpan = clone.querySelector('[class*="title"], [class*="text"], span') || clone;
+    const text = (titleSpan.textContent || '').trim();
+    return text || null;
+  }
+
+  /**
    * スレッドタイトルの取得（DOM検索 ＋ 永続キャッシュの両用）
+   * ※renderFolders() 内部から呼ばれるため、ここでは storage.set を呼ばず無限ループを防止
    */
   findThreadTitle(threadId) {
+    const fallbackTitle = `スレッド (${threadId.slice(-6)})`;
+
     // 1. DOMから最新タイトルを探索
-    const link = document.querySelector(`a[href*="${threadId}"]`);
+    const link = document.querySelector(`a[href*="/app/${threadId}"]`) || document.querySelector(`a[href*="${threadId}"]`);
     if (link) {
-      const titleSpan = link.querySelector('[class*="title"], [class*="text"], span') || link;
-      const text = titleSpan.textContent.trim();
-      if (text && text !== `スレッド (${threadId.slice(-6)})`) {
-        // キャッシュを更新
-        if (this.threadTitles[threadId] !== text) {
-          this.threadTitles[threadId] = text;
-          chrome.storage.local.set({ threadTitles: this.threadTitles });
-        }
+      const text = this.extractTitleFromLink(link);
+      if (text && text !== fallbackTitle) {
+        this.threadTitles[threadId] = text;
         return text;
       }
     }
@@ -301,7 +328,7 @@ class SidebarFoldersModule {
     }
 
     // 3. フォールバック
-    return `スレッド (${threadId.slice(-6)})`;
+    return fallbackTitle;
   }
 
   toggleFolderCollapse(folderId) {
@@ -312,10 +339,18 @@ class SidebarFoldersModule {
   }
 
   /**
-   * 各スレッド行に「📁」クイック移動ボタンを付与
+   * 各スレッド行に「📁」クイック移動ボタンを付与・タイトル変更のリアルタイム同期
    */
   attachQuickButtonsToThreads() {
     const threadLinks = document.querySelectorAll('a[href*="/app/"]');
+    let hasStorageUpdate = false;
+    let hasFolderThreadTitleChanged = false;
+
+    // いずれかのフォルダに登録されているスレッドIDのセット
+    const folderThreadIds = new Set();
+    this.folders.forEach(f => {
+      (f.threadIds || []).forEach(id => folderThreadIds.add(id));
+    });
 
     threadLinks.forEach((link) => {
       const threadId = this.extractThreadId(link.href || link.getAttribute('href') || '');
@@ -323,12 +358,16 @@ class SidebarFoldersModule {
 
       const rowItem = link.closest('[class*="conversation"], [class*="item"], side-nav-entry') || link;
 
-      // タイトルキャッシュの自動収集
-      const titleSpan = rowItem.querySelector('[class*="title"], [class*="text"], span') || link;
-      const titleText = titleSpan ? titleSpan.textContent.trim() : null;
-      if (titleText && !this.threadTitles[threadId]) {
+      // タイトルキャッシュの自動収集とリネーム検知によるリアルタイム更新
+      const titleText = this.extractTitleFromLink(link);
+      const fallbackTitle = `スレッド (${threadId.slice(-6)})`;
+
+      if (titleText && titleText !== fallbackTitle && this.threadTitles[threadId] !== titleText) {
         this.threadTitles[threadId] = titleText;
-        chrome.storage.local.set({ threadTitles: this.threadTitles });
+        hasStorageUpdate = true;
+        if (folderThreadIds.has(threadId)) {
+          hasFolderThreadTitleChanged = true;
+        }
       }
 
       if (rowItem.dataset.gExtQuickProcessed) return;
@@ -351,6 +390,13 @@ class SidebarFoldersModule {
         rowItem.appendChild(quickBtn);
       }
     });
+
+    if (hasStorageUpdate) {
+      chrome.storage.local.set({ threadTitles: this.threadTitles });
+    }
+    if (hasFolderThreadTitleChanged) {
+      this.renderFolders();
+    }
   }
 
   showThreadFolderPicker(anchorEl, threadId, rowItem) {
@@ -380,8 +426,8 @@ class SidebarFoldersModule {
       const opt = document.createElement('div');
       opt.className = 'g-ext-folder-menu-item';
       opt.innerHTML = `
-        <span>${f.icon || '📁'}</span>
-        <span style="flex:1;">${f.name}</span>
+        <span>${this.escapeHtml(f.icon || '📁')}</span>
+        <span style="flex:1;">${this.escapeHtml(f.name)}</span>
         ${isAlreadyIn ? `<span style="font-size:10px;color:var(--g-ext-success);">✓ 登録済</span>` : ''}
       `;
 
@@ -471,6 +517,10 @@ class SidebarFoldersModule {
     const modalBackdrop = document.createElement('div');
     modalBackdrop.className = 'g-ext-modal-backdrop';
 
+    const safeFolderName = this.escapeHtml(folder.name);
+    const safeFolderIcon = this.escapeHtml(folder.icon || '📁');
+    const safeFolderColor = this.escapeHtml(folder.color || '#4f80ff');
+
     modalBackdrop.innerHTML = `
       <div class="g-ext-modal" style="max-width:380px;">
         <div class="g-ext-modal-header">
@@ -480,17 +530,17 @@ class SidebarFoldersModule {
 
         <div class="g-ext-modal-field">
           <label class="g-ext-modal-label">フォルダ名</label>
-          <input type="text" id="g-ext-folder-name-input" class="g-ext-input" value="${folder.name}" placeholder="例: 創作・小説、業務リサーチ">
+          <input type="text" id="g-ext-folder-name-input" class="g-ext-input" value="${safeFolderName}" placeholder="例: 創作・小説、業務リサーチ">
         </div>
 
         <div style="display:flex;gap:12px;">
           <div class="g-ext-modal-field" style="flex:1;">
             <label class="g-ext-modal-label">アイコン絵文字</label>
-            <input type="text" id="g-ext-folder-icon-input" class="g-ext-input" value="${folder.icon || '📁'}">
+            <input type="text" id="g-ext-folder-icon-input" class="g-ext-input" value="${safeFolderIcon}">
           </div>
           <div class="g-ext-modal-field" style="flex:1;">
             <label class="g-ext-modal-label">アクセントカラー</label>
-            <input type="color" id="g-ext-folder-color-input" class="g-ext-input" style="height:38px;padding:2px;" value="${folder.color || '#4f80ff'}">
+            <input type="color" id="g-ext-folder-color-input" class="g-ext-input" style="height:38px;padding:2px;" value="${safeFolderColor}">
           </div>
         </div>
 
