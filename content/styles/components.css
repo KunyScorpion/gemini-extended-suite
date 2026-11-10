@@ -612,8 +612,14 @@
 }
 
 /* ==========================================================================
-   公式 @SKILL ワンクリック呼び出しボタン (Skill Launcher)
+   @SKILL ランチャーボタン ＆ ツリーポップアップメニュー (Skill Launcher)
    ========================================================================== */
+.g-ext-skill-launcher-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
 .g-ext-skill-launcher-btn {
   display: inline-flex;
   align-items: center;
@@ -638,7 +644,8 @@
   white-space: nowrap;
 }
 
-.g-ext-skill-launcher-btn:hover {
+.g-ext-skill-launcher-btn:hover,
+.g-ext-skill-launcher-btn.active {
   background: var(--g-ext-surface-hover);
   border-color: var(--g-ext-primary);
   color: var(--g-ext-primary);
@@ -652,6 +659,273 @@
 .g-ext-skill-launcher-icon {
   font-size: 11px;
   line-height: 1;
+}
+
+/* スキルツリー・ポップアップメニュー（ボタン直上へ fixed 配置で見切れ防止） */
+.g-ext-skill-tree-popover {
+  position: fixed;
+  bottom: calc(100% + 8px);
+  left: 16px;
+  width: 280px;
+  max-width: calc(100vw - 24px);
+  max-height: 380px;
+  background: var(--g-ext-surface);
+  border: 1px solid var(--g-ext-border);
+  border-radius: var(--g-ext-radius-md);
+  box-shadow: var(--g-ext-shadow);
+  backdrop-filter: blur(12px);
+  display: none;
+  flex-direction: column;
+  z-index: 10050;
+  overflow: hidden;
+  animation: g-ext-fadeIn 0.15s ease-out;
+  user-select: none;
+}
+
+.g-ext-skill-tree-popover.open {
+  display: flex;
+}
+
+.g-ext-skill-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--g-ext-border);
+  background: rgba(125, 125, 125, 0.05);
+}
+
+.g-ext-skill-popover-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--g-ext-text);
+}
+
+.g-ext-skill-popover-count {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--g-ext-primary);
+  background: rgba(79, 128, 255, 0.15);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.g-ext-skill-popover-close {
+  background: none;
+  border: none;
+  color: var(--g-ext-text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.g-ext-skill-popover-close:hover {
+  background: var(--g-ext-surface-hover);
+  color: var(--g-ext-text);
+}
+
+.g-ext-skill-tree-body {
+  padding: 8px 10px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 250px;
+}
+
+.g-ext-skill-tree-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.g-ext-skill-tree-summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px;
+  border-radius: var(--g-ext-radius-sm);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--g-ext-text);
+  cursor: pointer;
+  transition: background var(--g-ext-transition-fast);
+}
+
+.g-ext-skill-tree-summary::-webkit-details-marker {
+  display: none;
+}
+
+.g-ext-skill-tree-summary:hover {
+  background: var(--g-ext-surface-hover);
+}
+
+.g-ext-skill-tree-arrow {
+  font-size: 10px;
+  color: var(--g-ext-text-muted);
+  transition: transform 0.15s ease;
+  display: inline-block;
+}
+
+.g-ext-skill-tree-group[open] > .g-ext-skill-tree-summary .g-ext-skill-tree-arrow {
+  transform: rotate(90deg);
+}
+
+.g-ext-skill-tree-folder-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.g-ext-skill-tree-group-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.g-ext-skill-tree-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--g-ext-text-muted);
+  background: rgba(125, 125, 125, 0.15);
+  padding: 0 5px;
+  border-radius: 8px;
+}
+
+/* ツリー枝のインデントガイド線 */
+.g-ext-skill-tree-children {
+  margin-left: 11px;
+  padding-left: 10px;
+  border-left: 1.5px solid var(--g-ext-border);
+  margin-top: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.g-ext-skill-tree-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  border-radius: var(--g-ext-radius-sm);
+  font-size: 12px;
+  font-family: var(--g-ext-font-mono);
+  color: var(--g-ext-text);
+  cursor: pointer;
+  transition: background var(--g-ext-transition-fast), color var(--g-ext-transition-fast);
+}
+
+.g-ext-skill-tree-item:hover {
+  background: var(--g-ext-surface-hover);
+  color: var(--g-ext-primary);
+}
+
+.g-ext-skill-item-prefix {
+  color: var(--g-ext-primary);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.g-ext-skill-item-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.g-ext-skill-item-delete {
+  background: none;
+  border: none;
+  color: var(--g-ext-text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 1px 4px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.g-ext-skill-tree-item:hover .g-ext-skill-item-delete {
+  opacity: 0.75;
+}
+
+.g-ext-skill-item-delete:hover {
+  opacity: 1 !important;
+  color: var(--g-ext-danger);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+/* スキル未取得時の案内ビュー */
+.g-ext-skill-empty {
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+
+.g-ext-skill-empty-text {
+  font-size: 11px;
+  color: var(--g-ext-text-muted);
+  line-height: 1.5;
+}
+
+.g-ext-skill-open-page-btn {
+  width: 100%;
+  font-size: 11px;
+  padding: 6px 10px;
+}
+
+/* 手動スキル追加インラインフォーム */
+.g-ext-skill-manual-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-top: 1px dashed var(--g-ext-border);
+  background: rgba(125, 125, 125, 0.04);
+}
+
+.g-ext-skill-manual-input {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.g-ext-skill-manual-save {
+  padding: 4px 10px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* ポップアップ下部フッター */
+.g-ext-skill-popover-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  border-top: 1px solid var(--g-ext-border);
+  background: rgba(125, 125, 125, 0.04);
+  gap: 6px;
+}
+
+.g-ext-skill-manage-link {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--g-ext-primary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.g-ext-skill-manage-link:hover {
+  text-decoration: underline;
 }
 
 /* ==========================================================================

@@ -85,26 +85,41 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     console.log('[Gemini Extended Suite Service Worker] Opening hidden tab for auto-sync...');
-    
-    // #g-ext-auto-sync ハッシュを付与して、アドオンによる自動起動であることを明示
-    chrome.tabs.create({
-      url: 'https://gemini.google.com/usage#g-ext-auto-sync',
-      active: false
-    }, (tab) => {
-      currentSyncTabId = tab.id;
 
-      clearTimeout(syncTabSafetyTimer);
-      syncTabSafetyTimer = setTimeout(() => {
-        if (currentSyncTabId) {
-          console.log('[Gemini Extended Suite Service Worker] Safety timer: closing sync tab', currentSyncTabId);
-          chrome.tabs.remove(currentSyncTabId).catch(() => {});
-          currentSyncTabId = null;
+    const createSyncTab = (retryCount = 0) => {
+      // #g-ext-auto-sync ハッシュを付与して、アドオンによる自動起動であることを明示
+      chrome.tabs.create({
+        url: 'https://gemini.google.com/usage#g-ext-auto-sync',
+        active: false
+      }, (tab) => {
+        const lastErr = chrome.runtime.lastError;
+        if (lastErr || !tab || typeof tab.id === 'undefined') {
+          // ユーザーがタブをドラッグ中などの場合は少し待ってリトライ（最大3回）
+          if (retryCount < 3) {
+            setTimeout(() => createSyncTab(retryCount + 1), 600);
+          } else {
+            console.log('[Gemini Extended Suite Service Worker] Tab creation skipped:', lastErr?.message || 'No tab returned');
+            sendResponse({ status: 'tab_create_skipped', error: lastErr?.message });
+          }
+          return;
         }
-      }, 5000);
 
-      sendResponse({ status: 'tab_created', tabId: tab.id });
-    });
+        currentSyncTabId = tab.id;
 
+        clearTimeout(syncTabSafetyTimer);
+        syncTabSafetyTimer = setTimeout(() => {
+          if (currentSyncTabId) {
+            console.log('[Gemini Extended Suite Service Worker] Safety timer: closing sync tab', currentSyncTabId);
+            chrome.tabs.remove(currentSyncTabId).catch(() => {});
+            currentSyncTabId = null;
+          }
+        }, 5000);
+
+        sendResponse({ status: 'tab_created', tabId: tab.id });
+      });
+    };
+
+    createSyncTab(0);
     return true;
   }
 

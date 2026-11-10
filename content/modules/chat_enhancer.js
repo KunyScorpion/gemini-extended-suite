@@ -18,6 +18,7 @@ class ChatEnhancerModule {
     this.isGenerating = false;
     this.generationCheckInterval = null;
     this.lastTocSignature = ''; // フリッカー防止用のDOMシグネチャ
+    this.currentTocElements = []; // 保持している目次要素の接続状態チェック用
     this.isInputListenerBound = false; // inputイベントリスナー多重登録防止フラグ
   }
 
@@ -269,11 +270,10 @@ class ChatEnhancerModule {
     this.updateTocItems();
   }
 
-  updateTocItems() {
-    const listBody = document.getElementById('g-ext-toc-list-body');
-    if (!listBody) return;
-
-    // 1. ユーザー発言要素の候補を収集
+  /**
+   * ライブDOMからトップレベルのユーザー発言要素を順番通り抽出するヘルパー
+   */
+  getTopLevelUserElements() {
     const rawElements = Array.from(document.querySelectorAll(
       '.user-query, [class*="user-query"], user-query, [data-role="user"], [class*="user-turn"]'
     )).filter(el => {
@@ -281,14 +281,23 @@ class ChatEnhancerModule {
       return txt.length > 0 && !el.closest('.g-ext-toc-container');
     });
 
-    // 2. 包含関係の排除（他の候補要素の中に含まれている子要素は除外）
-    const topLevelUserElements = rawElements.filter(el => {
+    // 親子包含関係のみを排除
+    return rawElements.filter(el => {
       return !rawElements.some(other => other !== el && other.contains(el));
     });
+  }
 
-    // 3. テキストの重複排除と整形
+  updateTocItems() {
+    const listBody = document.getElementById('g-ext-toc-list-body');
+    if (!listBody) return;
+
+    // 1. ライブDOMからトップレベルのユーザー発言要素を収集
+    const topLevelUserElements = this.getTopLevelUserElements();
+
+    // 2. テキスト整形（別ターンの同一テキストは排除せず、同一ターン内の直前兄弟重複のみガード）
     const uniqueTurns = [];
-    const seenTexts = new Set();
+    let prevEl = null;
+    let prevText = null;
 
     topLevelUserElements.forEach(el => {
       let rawText = (el.innerText || el.textContent || '').trim();
@@ -300,20 +309,33 @@ class ChatEnhancerModule {
 
       if (!cleaned) cleaned = rawText; // 万が一空になった場合は元テキスト
 
-      // 先頭30文字で重複チェック（同一発言の重複登録を防止）
-      const key = cleaned.slice(0, 30);
-      if (!seenTexts.has(key)) {
-        seenTexts.add(key);
+      // 同一ターン内で万が一兄弟要素として完全同一テキストが連続する場合のみ直前要素と比較してガード
+      const isSameTurnSiblingDuplicate =
+        prevEl &&
+        prevText === cleaned &&
+        prevEl.parentElement === el.parentElement &&
+        prevEl.nextElementSibling === el &&
+        !!prevEl.closest('.conversation-turn, [class*="conversation-turn"]') &&
+        prevEl.closest('.conversation-turn, [class*="conversation-turn"]') === el.closest('.conversation-turn, [class*="conversation-turn"]');
+
+      if (!isSameTurnSiblingDuplicate) {
         uniqueTurns.push({ element: el, text: cleaned });
+        prevEl = el;
+        prevText = cleaned;
       }
     });
 
-    // 4. シグネチャ照合（フリッカー防止）
-    const signature = uniqueTurns.map(t => t.text.slice(0, 20)).join('||');
-    if (signature === this.lastTocSignature && listBody.children.length > 0) {
+    // 3. シグネチャ照合（テキスト、ターン数、末尾要素の接続状態、保持している要素参照のisConnectedを確認）
+    const lastElConnected = uniqueTurns.length > 0 ? !!uniqueTurns[uniqueTurns.length - 1].element?.isConnected : true;
+    const signature = `${uniqueTurns.length}::${lastElConnected}::` + uniqueTurns.map(t => t.text.slice(0, 20)).join('||');
+    const hasDisconnectedRef = Array.isArray(this.currentTocElements) &&
+      (this.currentTocElements.length !== uniqueTurns.length || this.currentTocElements.some(el => !el || !el.isConnected));
+
+    if (signature === this.lastTocSignature && !hasDisconnectedRef && listBody.children.length > 0) {
       return;
     }
     this.lastTocSignature = signature;
+    this.currentTocElements = uniqueTurns.map(t => t.element);
 
     listBody.innerHTML = '';
 
@@ -335,12 +357,28 @@ class ChatEnhancerModule {
         e.preventDefault();
         e.stopPropagation();
 
-        turn.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        let targetEl = turn.element;
+        if (!targetEl || !targetEl.isConnected) {
+          targetEl = this.getTopLevelUserElements()[idx];
+          if (targetEl) {
+            turn.element = targetEl;
+            if (Array.isArray(this.currentTocElements)) {
+              this.currentTocElements[idx] = targetEl;
+            }
+          }
+        }
+        if (!targetEl) return;
 
-        turn.element.style.transition = 'outline 0.2s ease';
-        turn.element.style.outline = '2px solid var(--g-ext-primary)';
+        const scrollTarget = (targetEl.offsetHeight > 0 ? targetEl : targetEl.firstElementChild) ||
+                             targetEl.closest('.conversation-turn, [class*="conversation-turn"]') ||
+                             targetEl;
+
+        scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        scrollTarget.style.transition = 'outline 0.2s ease';
+        scrollTarget.style.outline = '2px solid var(--g-ext-primary)';
         setTimeout(() => {
-          turn.element.style.outline = 'none';
+          scrollTarget.style.outline = 'none';
         }, 1200);
       });
 

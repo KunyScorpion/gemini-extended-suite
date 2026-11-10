@@ -56,3 +56,10 @@ desktop.ini
 tmp/
 temp/
 *.tmp
+.parcel-cache/
+.turbo/
+.npm/
+
+# AI agent and workspace local metadata
+.gemini/
+.claude/

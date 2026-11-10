@@ -4,7 +4,7 @@
  */
 
 (function () {
-  console.log('[Gemini Extended Suite] v1.5.0 initializing on Gemini Web...');
+  console.log('[Gemini Extended Suite] v1.6.0 initializing on Gemini Web...');
 
   function bootstrap() {
     if (window.geminiDomObserver) {

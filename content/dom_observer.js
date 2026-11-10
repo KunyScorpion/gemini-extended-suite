@@ -81,10 +81,11 @@ class GeminiDomObserver {
   _isExtensionNode(node) {
     if (!node) return false;
     const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-    if (!el) return false;
+    if (!el || el === document.body || el === document.documentElement) return false;
     if (typeof el.id === 'string' && el.id.startsWith('g-ext-')) return true;
     if (typeof el.className === 'string' && el.className.includes('g-ext-')) return true;
-    return !!el.closest?.('[class*="g-ext-"], [id^="g-ext-"]');
+    const extAncestor = el.closest?.('[class*="g-ext-"], [id^="g-ext-"]');
+    return !!(extAncestor && extAncestor !== document.body && extAncestor !== document.documentElement);
   }
 
   _setupMutationObserver() {

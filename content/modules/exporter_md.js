@@ -135,7 +135,7 @@ class ExporterMdModule {
         <div class="g-ext-modal-field">
           <label class="g-ext-modal-label">スレッド名 / 保存ファイル名</label>
           <input type="text" id="g-ext-export-filename-input" class="g-ext-input" value="${safeDefaultTitle}" placeholder="スレッド名またはファイル名を入力">
-          <span style="font-size:11px;color:var(--g-ext-text-muted);margin-top:2px;">※保存時は「YYYYMMDD_スレッド名.md」として出力されます。</span>
+          <span style="font-size:11px;color:var(--g-ext-text-muted);margin-top:2px;">※保存時は「スレッド名.md」として出力されます。</span>
         </div>
 
         <div class="g-ext-modal-field">
@@ -258,7 +258,6 @@ class ExporterMdModule {
     const currentUrl = window.location.href;
     const now = new Date();
     const dateStr = now.toISOString().replace(/T/, ' ').replace(/\..+/, '');
-    const datePrefix = now.toISOString().slice(0, 10).replace(/-/g, '');
 
     const messageTurns = this.extractMessageTurns();
 
@@ -298,7 +297,7 @@ generator: "Gemini Extended Suite"
 
     if (!sanitizedTitle) sanitizedTitle = 'Gemini_Chat';
 
-    const filename = `${datePrefix}_${sanitizedTitle}.md`;
+    const filename = `${sanitizedTitle}.md`;
 
     this.downloadFile(filename, md);
   }
