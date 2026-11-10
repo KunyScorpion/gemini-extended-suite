@@ -41,11 +41,6 @@ Gemini の頻繁な UI 更新や SPA（Single Page Application）の非同期 DO
 ### スキル自動取得（`/customize/skills` 連携）
 Gemini公式のスキル管理ページ（`/customize/skills`）を開くだけで、インストール済みスキルを自動検知してローカルストレージへ即時同期・保存します（推奨テンプレートの誤取得は自動除外）。
 
-<div align="center">
-
-![Gemini スキル管理ページ連携](docs/screenshots/gemini-skills-page.png)
-
-</div>
 
 ### ポップアップ管理画面 (Popup Interface)
 拡張機能アイコンをクリックすることで、各機能の有効/無効のワンクリック切り替え、フォルダ構成・設定の JSON バックアップ/リストアが可能です。
