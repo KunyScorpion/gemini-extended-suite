@@ -67,11 +67,25 @@ class ChatEnhancerModule {
   }
 
   applyFullWidth(enabled) {
-    if (enabled) {
+    this.fullWidth = !!enabled;
+    if (this.fullWidth) {
       document.body.classList.add('g-ext-full-width-enabled');
     } else {
       document.body.classList.remove('g-ext-full-width-enabled');
     }
+
+    const fullBtn = document.getElementById(this.fullWidthBtnId);
+    if (fullBtn) {
+      fullBtn.style.borderColor = this.fullWidth ? 'var(--g-ext-primary)' : 'var(--g-ext-border)';
+    }
+
+    const resyncToolbarModules = () => {
+      window.thinkingSelectorModule?.checkAndMount();
+      window.skillLauncherModule?.checkAndMount();
+    };
+    resyncToolbarModules();
+    setTimeout(resyncToolbarModules, 100);
+    setTimeout(resyncToolbarModules, 350);
   }
 
   mountFullWidthToggle() {
@@ -92,12 +106,12 @@ class ChatEnhancerModule {
     btn.className = 'g-ext-export-btn';
     btn.innerHTML = `<span>⤢</span><span>ワイド</span>`;
     btn.title = '全幅ワイド表示の切り替え (85%〜100%)';
+    btn.style.borderColor = this.fullWidth ? 'var(--g-ext-primary)' : 'var(--g-ext-border)';
 
     btn.addEventListener('click', async () => {
       this.fullWidth = !this.fullWidth;
       this.applyFullWidth(this.fullWidth);
       await chrome.storage.local.set({ fullWidthMode: this.fullWidth });
-      btn.style.borderColor = this.fullWidth ? 'var(--g-ext-primary)' : 'var(--g-ext-border)';
     });
 
     utilBar.appendChild(btn);

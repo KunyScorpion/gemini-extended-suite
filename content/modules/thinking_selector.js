@@ -1,7 +1,7 @@
 /**
  * Gemini Extended Suite - Feature 7: 思考レベル (Thinking Level) クイック切替
- * 2026/10仕様変更に伴う3段階の思考レベル（低/中/高）をボタン一発で瞬時に切替
- * 安定した自動マウント・自己位置修復・手動変更への即時追従対応版
+ * 2026/10・2026/11仕様変更に伴う3段階の思考レベル（低/標準(中)/高）をボタン一発で瞬時に切替
+ * 入力エリア限定の安全なアンカー特定・自己位置修復・手動変更への即時追従対応版
  */
 
 class ThinkingSelectorModule {
@@ -14,6 +14,19 @@ class ThinkingSelectorModule {
     this.modelBtnObserver = null;
     this.mountWatcherInterval = null;
     this.watcherIntervalMs = 300;
+    this.invalidContainerSelector = [
+      'bard-sidenav',
+      'side-nav',
+      'mat-sidenav',
+      '[data-test-id="overflow-container"]',
+      'model-response',
+      'user-query',
+      'message-content',
+      'message-actions',
+      '.conversation-turn',
+      '.cdk-overlay-container',
+      '.cdk-overlay-pane'
+    ].join(', ');
 
     // インスタンス生成直後から即時監視を開始（初期ロード遅延・アドオン設定触り不要化）
     this.startMountWatcher(300);
@@ -40,6 +53,38 @@ class ThinkingSelectorModule {
   }
 
   /**
+   * 要素が画面上に可視状態であるかを判定
+   */
+  isVisibleElement(el) {
+    if (!el || typeof el.getBoundingClientRect !== 'function') return false;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return false;
+    const style = window.getComputedStyle(el);
+    return style.display !== 'none' && style.visibility !== 'hidden';
+  }
+
+  /**
+   * サイドバー・会話本文・オーバーレイ・拡張機能自身などの無効コンテキスト内かどうかを判定
+   */
+  isInvalidButtonContext(el) {
+    if (!el) return true;
+    if (el.id === this.containerId) return true;
+    const extAncestor = el.closest('[id^="g-ext-"], [class*="g-ext-"]:not(body):not(html)');
+    if (extAncestor && extAncestor !== document.body && extAncestor !== document.documentElement) {
+      return true;
+    }
+    return !!el.closest(this.invalidContainerSelector);
+  }
+
+  /**
+   * マウント済みルート要素が不正な領域（サイドバー等）に配置されていないか判定
+   */
+  isInInvalidContainer(el) {
+    if (!el || !el.parentElement) return true;
+    return !!el.parentElement.closest(this.invalidContainerSelector);
+  }
+
+  /**
    * 常駐マウントウォッチャー（初回マウント完了後は2000ms間隔に緩和してCPU負荷を軽減）
    */
   startMountWatcher(intervalMs = 300) {
@@ -55,21 +100,31 @@ class ThinkingSelectorModule {
       if (!existing && anchorInfo) {
         // 未マウントでアンカーが見つかったら即マウント
         this.mountUI(anchorInfo.parent, anchorInfo.beforeElement);
+        window.skillLauncherModule?.checkAndMount();
         if (this.watcherIntervalMs !== 2000) {
           this.startMountWatcher(2000);
         }
       } else if (existing && anchorInfo) {
-        // 既に存在するが位置がズレている場合（上段に浮いている等）は正しい位置へ自己修復
-        if (existing.parentElement !== anchorInfo.parent || existing.nextElementSibling !== anchorInfo.beforeElement) {
+        // 既に存在するが位置がズレている場合や不正領域にいる場合は正しい位置へ自己修復
+        if (
+          this.isInInvalidContainer(existing) ||
+          existing.parentElement !== anchorInfo.parent ||
+          existing.nextElementSibling !== anchorInfo.beforeElement
+        ) {
           console.log('[Gemini Extended Suite] 思考レベルボタンをモデル選択の左隣へ自己修復配置します');
           anchorInfo.parent.insertBefore(existing, anchorInfo.beforeElement);
         }
+        window.skillLauncherModule?.checkAndMount();
         this.syncActiveLevel();
         // 初回マウント完了・正常配置確認後はポーリング間隔を2000msへ緩和
         if (this.watcherIntervalMs !== 2000) {
           this.startMountWatcher(2000);
         }
       } else if (existing) {
+        if (this.isInInvalidContainer(existing)) {
+          existing.remove();
+          return;
+        }
         this.syncActiveLevel();
       }
     }, intervalMs);
@@ -85,24 +140,33 @@ class ThinkingSelectorModule {
     const existing = document.getElementById(this.containerId);
 
     if (!anchorInfo) {
+      if (existing && this.isInInvalidContainer(existing)) {
+        existing.remove();
+      }
       return;
     }
 
     if (existing) {
-      if (existing.parentElement !== anchorInfo.parent || existing.nextElementSibling !== anchorInfo.beforeElement) {
+      if (
+        this.isInInvalidContainer(existing) ||
+        existing.parentElement !== anchorInfo.parent ||
+        existing.nextElementSibling !== anchorInfo.beforeElement
+      ) {
         console.log('[Gemini Extended Suite] 思考レベルボタンをモデル選択の左隣へ再配置します');
         anchorInfo.parent.insertBefore(existing, anchorInfo.beforeElement);
       }
+      window.skillLauncherModule?.checkAndMount();
       this.syncActiveLevel();
       return;
     }
 
     this.mountUI(anchorInfo.parent, anchorInfo.beforeElement);
+    window.skillLauncherModule?.checkAndMount();
   }
 
   /**
    * マウント先アンカーの特定
-   * ★モデルピッカーの「上」ではなく、下部ツールバー内の「モデルピッカーコンテナのすぐ左隣（黄色枠）」を100%確実に特定
+   * ★モデルピッカーの「上」ではなく、下部ツールバー内の「モデルピッカーコンテナのすぐ左隣」を確実に特定
    */
   findMountAnchor() {
     const modelBtn = this.findModelPickerButton();
@@ -110,16 +174,19 @@ class ThinkingSelectorModule {
 
     this.attachButtonObserver(modelBtn);
 
-    // 1. モデルボタンの周辺から、マイクや送信ボタンが並ぶ「下部ツールバー行コンテナ」を探索
-    // ※モデルボタン単体を囲む狭いラッパーの中に突っ込むと縦積み（真上）になってしまうため、
-    // 必ずツールバー行コンテナの中で、モデルピッカーラッパーの直前（左隣）に挿入する！
-    let toolbar = modelBtn.closest('[class*="actions"], [class*="toolbar"], [class*="trailing"], [class*="bottom"], [class*="buttons"]');
+    // 1. モデルボタンの周辺から、マイクや送信ボタンが並ぶ「下部ツールバー行コンテナ」を探索（外枠誤爆防止のため [class*="bottom"] は除外）
+    let toolbar = modelBtn.closest('[class*="actions"], [class*="toolbar"], [class*="trailing"], [class*="buttons"]');
+    if (toolbar && toolbar.closest(this.invalidContainerSelector)) {
+      toolbar = null;
+    }
 
+    // 2. 見つからない場合のみ、親を辿ってマイクや送信ボタンを含む行を探す
     if (!toolbar) {
       let curr = modelBtn.parentElement;
       while (curr && curr !== document.body && !curr.matches('.chat-input-container, form, rich-textarea, main')) {
+        if (curr.closest(this.invalidContainerSelector)) break;
         const hasOtherAction = curr.querySelector(
-          'button[aria-label*="マイク"], button[aria-label*="音声"], button[aria-label*="送信"], [class*="send"], [class*="mic"]'
+          'button[aria-label*="マイク"], button[aria-label*="音声"], button[aria-label*="送信"], button[aria-label*="Mic"], button[aria-label*="Send"], [class*="send"], [class*="mic"]'
         );
         if (hasOtherAction && hasOtherAction !== modelBtn) {
           toolbar = curr;
@@ -129,7 +196,7 @@ class ThinkingSelectorModule {
       }
     }
 
-    // 2. ツールバー行の中で、モデルボタンを内包しているトップレベルの子要素（ラッパーまたはボタン自身）を特定
+    // 3. ツールバー行の中で、モデルボタンを内包しているトップレベルの子要素（ラッパーまたはボタン自身）を特定
     if (toolbar) {
       let anchorChild = modelBtn;
       while (anchorChild && anchorChild.parentElement !== toolbar) {
@@ -139,13 +206,13 @@ class ThinkingSelectorModule {
       if (anchorChild && anchorChild.parentElement === toolbar) {
         return {
           parent: toolbar,
-          beforeElement: anchorChild // モデルピッカー枠全体の「直前（左隣・同一行）」！
+          beforeElement: anchorChild // モデルピッカー枠全体の「直前（左隣・同一行）」
         };
       }
     }
 
-    // 3. フォールバック: 親要素の親（横並び行）
-    if (modelBtn.parentElement && modelBtn.parentElement.parentElement) {
+    // 4. フォールバック: 親要素の親（横並び行）
+    if (modelBtn.parentElement && modelBtn.parentElement.parentElement && !modelBtn.parentElement.parentElement.closest(this.invalidContainerSelector)) {
       return {
         parent: modelBtn.parentElement.parentElement,
         beforeElement: modelBtn.parentElement
@@ -158,16 +225,28 @@ class ThinkingSelectorModule {
     };
   }
 
+  /**
+   * 可視の <button> 要素のみからモデルピッカーボタンを探索
+   */
   findModelPickerButton() {
-    // 画面全体からモデル選択ボタンを探索（スコープ制限による取りこぼしを完全防止）
-    const buttons = Array.from(document.querySelectorAll('button'));
-    const keywords = ['Argon', 'Flash', 'Pro', 'Ultra', 'Gemini'];
+    const allButtons = Array.from(document.querySelectorAll('button')).filter(btn => {
+      if (this.isInvalidButtonContext(btn)) return false;
+      const rect = btn.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    });
 
-    for (const btn of buttons) {
-      if (btn.id === this.containerId || btn.closest('[class*="g-ext-"], [id^="g-ext-"]')) continue;
+    const keywords = [
+      'Hydrogen', 'Carbon', 'Argon', 'Flash', 'Pro', 'Ultra', 'Nano', 'Gemini',
+      '迅速な回答', '日々の暮らし', '詳細なリサーチ', 'コードと分析', '複雑な作業'
+    ];
+
+    // 1. 実績あるキーワード探索（可視 <button> のみ）
+    for (const btn of allButtons) {
       const text = (btn.textContent || '').trim();
+      if (!text || text.length >= 35) continue;
+
       const hasModelKeyword = keywords.some(kw => text.includes(kw));
-      const hasThinkingKeyword = text.includes('高値') || text.includes('安値') || text.includes('中');
+      const hasThinkingKeyword = text.includes('高値') || text.includes('安値') || text.includes('標準');
       const hasDropdown = !!btn.querySelector('svg, mat-icon, [class*="arrow"], [class*="expand"]') ||
                           btn.getAttribute('aria-haspopup') === 'menu' ||
                           btn.getAttribute('aria-expanded') !== null;
@@ -177,10 +256,15 @@ class ThinkingSelectorModule {
       }
     }
 
-    const attrBtn = document.querySelector(
-      'button[aria-label*="モデル"], button[aria-label*="Model"], button[data-test-id*="model"], [class*="model-picker-btn"], [class*="model-select"]'
-    );
-    if (attrBtn && !attrBtn.closest(`#${this.containerId}`)) return attrBtn;
+    // 2. 属性フォールバック（必ず可視 <button> のみ）
+    for (const btn of allButtons) {
+      if (
+        btn.matches('button[aria-label*="モデル"], button[aria-label*="Model"], button[data-test-id*="model"], button[class*="model-picker"], button[class*="model-select"]') ||
+        btn.closest('[class*="model-picker-btn"], [class*="model-select"], bard-mode-switcher')
+      ) {
+        return btn;
+      }
+    }
 
     return null;
   }
@@ -215,9 +299,9 @@ class ThinkingSelectorModule {
     root.innerHTML = `
       <span class="g-ext-thinking-label" title="思考レベル（Thinking Level）クイック切替">🧠 思考:</span>
       <div class="g-ext-thinking-group">
-        <button type="button" class="g-ext-thinking-btn" data-level="low" title="思考レベル: 低 (安値) - 時間をかけず効率的に回答">低</button>
-        <button type="button" class="g-ext-thinking-btn" data-level="medium" title="思考レベル: 中 - バランスを取って詳しく回答">中</button>
-        <button type="button" class="g-ext-thinking-btn" data-level="high" title="思考レベル: 高 (高値) - 徹底的に詳しく思考・回答">高</button>
+        <button type="button" class="g-ext-thinking-btn" data-level="low" title="思考レベル: 低 - 高速かつ効率的">低</button>
+        <button type="button" class="g-ext-thinking-btn" data-level="medium" title="思考レベル: 中 (標準) - バランスを取って詳しく">中</button>
+        <button type="button" class="g-ext-thinking-btn" data-level="high" title="思考レベル: 高 - 徹底的に詳しく">高</button>
       </div>
     `;
 
@@ -252,7 +336,69 @@ class ThinkingSelectorModule {
   }
 
   /**
-   * 現在選択されている思考レベルをボタンの表示やモデルピッカーから検知し同期
+   * メニュー項目要素から思考レベルテキストを抽出し、低/中/高 を判定するヘルパー
+   */
+  _extractNormalizedMenuText(item) {
+    const clone = item.cloneNode(true);
+    clone.querySelectorAll('mat-icon, svg, .mat-icon').forEach(icon => icon.remove());
+    const rawWithoutDomIcons = (clone.textContent || '').trim();
+    const rawText = rawWithoutDomIcons || (item.textContent || '').trim();
+    const textWithoutIcon = rawText
+      .replace(/^(check_circle_outline|check_circle|radio_button_checked|radio_button_unchecked|check|done|✓|✔|●|•)\s*/i, '')
+      .trim();
+    const lines = textWithoutIcon.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const firstLine = lines[0] || textWithoutIcon;
+    return { rawText, textWithoutIcon, firstLine, lower: textWithoutIcon.toLowerCase() };
+  }
+
+  /**
+   * サブメニュー項目が対象レベルに一致するか厳密判定
+   */
+  _matchesSubItemLevel(item, targetLevel) {
+    const { textWithoutIcon, firstLine } = this._extractNormalizedMenuText(item);
+    if (!textWithoutIcon || textWithoutIcon.length > 60) return false;
+    if (textWithoutIcon.includes('高速かつ効率的') && textWithoutIcon.includes('バランス')) return false;
+
+    if (targetLevel === 'low') {
+      return (
+        /^(低|安値|最小|low|min|light)([\s\u3000]|$)/i.test(firstLine) ||
+        /^(低|安値|最小|low|min|light)([\s\u3000\n]|$)/i.test(textWithoutIcon) ||
+        textWithoutIcon.includes('高速かつ効率的') ||
+        textWithoutIcon.includes('時間をかけず') ||
+        textWithoutIcon.includes('安値')
+      );
+    }
+
+    if (targetLevel === 'medium') {
+      return (
+        /^(標準|中|medium|standard|balanced)([\s\u3000]|$)/i.test(firstLine) ||
+        /^(標準|中|medium|standard|balanced)([\s\u3000\n]|$)/i.test(textWithoutIcon) ||
+        textWithoutIcon.includes('バランスを取って') ||
+        textWithoutIcon.includes('標準')
+      );
+    }
+
+    if (targetLevel === 'high') {
+      const startsWithOtherLevel =
+        /^(低|安値|最小|標準|中|low|medium|standard|balanced|min|light)([\s\u3000\n]|$)/i.test(firstLine) ||
+        /^(低|安値|最小|標準|中|low|medium|standard|balanced|min|light)([\s\u3000\n]|$)/i.test(textWithoutIcon);
+      if (startsWithOtherLevel) return false;
+
+      const textWithoutFast = textWithoutIcon.replace(/高速/g, '');
+      return (
+        /^(高値|高(?!速)|最大|high|deep|max)([\s\u3000]|$)/i.test(firstLine) ||
+        /^(高値|高(?!速)|最大|high|deep|max)([\s\u3000\n]|$)/i.test(textWithoutIcon) ||
+        textWithoutFast.includes('徹底的') ||
+        textWithoutFast.includes('高値') ||
+        textWithoutFast.includes('高')
+      );
+    }
+
+    return false;
+  }
+
+  /**
+   * 現在選択されている思考レベルをサブメニューのチェックマークやボタン表示から検知し同期
    */
   syncActiveLevel() {
     const root = document.getElementById(this.containerId);
@@ -263,17 +409,57 @@ class ThinkingSelectorModule {
       this.attachButtonObserver(modelBtn);
     }
 
-    const btnText = modelBtn ? (modelBtn.textContent || '').trim() : '';
-
     let detectedLevel = null;
 
-    // 「高値」「高」「High」の厳密検知（「高度な推論」等の誤認を防止）
-    if (btnText.includes('高値') || /high/i.test(btnText) || /[\s\u3000]高$/i.test(btnText) || /[\s\u3000]高[\s\u3000]/i.test(btnText)) {
-      detectedLevel = 'high';
-    } else if (btnText.includes('中') || /medium|balanced/i.test(btnText)) {
-      detectedLevel = 'medium';
-    } else if (btnText.includes('安値') || btnText.includes('低') || /low|fast/i.test(btnText)) {
-      detectedLevel = 'low';
+    // 1. 開いている思考レベルサブメニューのチェック状態から検知
+    const overlayItems = Array.from(document.querySelectorAll(
+      '.cdk-overlay-pane [role="menuitem"], .cdk-overlay-pane [role="menuitemcheckbox"], .cdk-overlay-pane [role="menuitemradio"], .cdk-overlay-pane [role="option"], .cdk-overlay-pane button.mat-mdc-menu-item, .cdk-overlay-pane .mat-menu-item, .cdk-overlay-pane button'
+    ));
+    for (const item of overlayItems) {
+      if (item.closest(`#${this.containerId}`)) continue;
+      if (!this.isVisibleElement(item)) continue;
+      if (this._isModelOrParentMenuItem(item)) continue;
+
+      const hasCheckAttr =
+        item.getAttribute('aria-checked') === 'true' ||
+        item.getAttribute('aria-selected') === 'true' ||
+        item.classList.contains('selected') ||
+        item.classList.contains('active') ||
+        item.classList.contains('checked');
+      const hasCheckIcon = Array.from(item.querySelectorAll('mat-icon, svg, [class*="check"], [class*="selected"]')).some(iconEl => {
+        if (!this.isVisibleElement(iconEl)) return false;
+        const iconTxt = (iconEl.textContent || '').trim().toLowerCase();
+        const fontIcon = (iconEl.getAttribute('fonticon') || iconEl.getAttribute('data-mat-icon-name') || '').toLowerCase();
+        if (iconEl.tagName.toLowerCase() === 'svg') {
+          return !iconEl.closest('[class*="arrow"], [class*="chevron"]');
+        }
+        return ['check', 'done', 'check_circle', '✓', '✔'].includes(iconTxt) || ['check', 'done', 'check_circle'].includes(fontIcon);
+      });
+
+      if (hasCheckAttr || hasCheckIcon) {
+        if (this._matchesSubItemLevel(item, 'low')) {
+          detectedLevel = 'low';
+          break;
+        } else if (this._matchesSubItemLevel(item, 'medium')) {
+          detectedLevel = 'medium';
+          break;
+        } else if (this._matchesSubItemLevel(item, 'high')) {
+          detectedLevel = 'high';
+          break;
+        }
+      }
+    }
+
+    // 2. ボタン表示テキストから検知（モデル名のみの表示の場合は上書きしない）
+    if (!detectedLevel) {
+      const btnText = modelBtn ? (modelBtn.textContent || '').trim() : '';
+      if (btnText.includes('高値') || /\bhigh\b/i.test(btnText) || /[\s\u3000]高(?!速)($|[\s\u3000])/i.test(btnText)) {
+        detectedLevel = 'high';
+      } else if (btnText.includes('標準') || btnText.includes('中') || /medium|balanced|standard/i.test(btnText)) {
+        detectedLevel = 'medium';
+      } else if (btnText.includes('安値') || btnText.includes('低') || /\b(low|fast)\b/i.test(btnText)) {
+        detectedLevel = 'low';
+      }
     }
 
     if (detectedLevel) {
@@ -291,15 +477,31 @@ class ThinkingSelectorModule {
   }
 
   /**
+   * メニュー項目がモデル選択肢や「思考レベル」親項目（サブメニュー項目ではないもの）かどうかを判定
+   */
+  _isModelOrParentMenuItem(item) {
+    const rawText = (item?.textContent || '').trim();
+    if (!rawText) return true;
+    const lower = rawText.toLowerCase();
+
+    if (rawText.includes('思考レベル') || rawText.includes('思考の深さ') || lower.includes('thinking level')) {
+      return true;
+    }
+
+    const modelBlacklist = [
+      'hydrogen', 'carbon', 'argon', 'flash', 'pro', 'ultra', 'nano',
+      '迅速な回答', '日々の暮らし', '詳細なリサーチ', 'コードと分析', '複雑な作業',
+      '4 hydrogen', '4 argon', '4 carbon', '3.5', '3.8', '3.1',
+      '高度な推論', 'すばやく回答', 'あらゆる場面', '複雑なタスク'
+    ];
+    return modelBlacklist.some(kw => lower.includes(kw));
+  }
+
+  /**
    * 思考レベルを自動選択（公式メニューをバックグラウンドで操作）
    */
   async selectThinkingLevel(targetLevel) {
     if (this.isSwitching) return;
-    if (this.currentLevel === targetLevel) {
-      const levelNames = { low: '低 (安値)', medium: '中', high: '高 (高値)' };
-      this.showToast(`思考レベルは既に「${levelNames[targetLevel]}」です`);
-      return;
-    }
 
     this.isSwitching = true;
     this.updateButtonLoading(targetLevel, true);
@@ -309,7 +511,7 @@ class ThinkingSelectorModule {
       if (success) {
         this.currentLevel = targetLevel;
         this.syncActiveLevel();
-        const levelNames = { low: '低 (安値)', medium: '中', high: '高 (高値)' };
+        const levelNames = { low: '低', medium: '中 (標準)', high: '高' };
         this.showToast(`思考レベルを「${levelNames[targetLevel]}」に変更しました`);
       } else {
         console.warn('[Gemini Extended Suite] Failed to automatically switch thinking level');
@@ -362,27 +564,24 @@ class ThinkingSelectorModule {
       return false;
     }
 
-    // 3. 既に1段目のメニュー内に目的のレベル項目が表示されているかチェック
+    // 3. 先に1段目メニューから「思考レベル」親項目を探索
     await this._sleep(60);
-    let targetSubItem = this._findTargetSubItem(targetLevel);
+    const thinkingMenuItem = await this._waitForThinkingMenuItem(350);
+    let targetSubItem = null;
 
-    if (!targetSubItem) {
-      // メニューから「思考レベル」親項目を探索
-      const thinkingMenuItem = this._findThinkingMenuItem();
-      if (thinkingMenuItem) {
-        // 4a. まずホバーでサブメニュー展開を試みる（ホバーで開くメニューをクリックして閉じてしまうのを防ぐ）
-        this._triggerHover(thinkingMenuItem);
-        targetSubItem = await this._waitForSubMenuItem(targetLevel, 350);
+    if (thinkingMenuItem) {
+      // 4a. まずホバーでサブメニュー展開を試みる（ホバーで開くメニューをクリックして閉じてしまうのを防ぐ）
+      this._triggerHover(thinkingMenuItem);
+      targetSubItem = await this._waitForSubMenuItem(targetLevel, 400, thinkingMenuItem);
 
-        // 4b. ホバーだけで開かない場合はクリックして展開を待つ
-        if (!targetSubItem) {
-          thinkingMenuItem.click();
-          targetSubItem = await this._waitForSubMenuItem(targetLevel, 1000);
-        }
-      } else {
-        // 「思考レベル」親項目が見つからない場合も少し待って直接探索
-        targetSubItem = await this._waitForSubMenuItem(targetLevel, 600);
+      // 4b. ホバーだけで開かない場合はクリックして展開を待つ
+      if (!targetSubItem) {
+        thinkingMenuItem.click();
+        targetSubItem = await this._waitForSubMenuItem(targetLevel, 1000, thinkingMenuItem);
       }
+    } else {
+      // 「思考レベル」親項目が存在しないUIの場合のみ、1段目メニューから直接探索
+      targetSubItem = await this._waitForSubMenuItem(targetLevel, 600, null);
     }
 
     if (!targetSubItem) {
@@ -391,7 +590,7 @@ class ThinkingSelectorModule {
       return false;
     }
 
-    // 5. 目的の思考レベルをクリック！
+    // 5. 目的の思考レベルをクリック
     targetSubItem.click();
 
     // 6. メニューが残っていれば確実に閉じる
@@ -405,17 +604,38 @@ class ThinkingSelectorModule {
     return true;
   }
 
+  _waitForThinkingMenuItem(timeoutMs = 350) {
+    return new Promise(resolve => {
+      const immediate = this._findThinkingMenuItem();
+      if (immediate) return resolve(immediate);
+
+      const startTime = Date.now();
+      const interval = setInterval(() => {
+        const item = this._findThinkingMenuItem();
+        if (item) {
+          clearInterval(interval);
+          resolve(item);
+        } else if (Date.now() - startTime > timeoutMs) {
+          clearInterval(interval);
+          resolve(null);
+        }
+      }, 30);
+    });
+  }
+
   _findThinkingMenuItem() {
     const items = Array.from(document.querySelectorAll(
-      '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], button.mat-mdc-menu-item, .mat-menu-item, [class*="menu-item"]'
+      '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], button.mat-mdc-menu-item, .mat-menu-item, [class*="menu-item"], .cdk-overlay-pane button'
     ));
 
     const keywords = ['思考レベル', 'Thinking level', 'Thinking', '思考'];
+    const modelExcludeWords = ['Hydrogen', 'Carbon', 'Argon', 'Flash', 'Pro', 'Ultra', 'Nano'];
     for (const item of items) {
       if (item.closest(`#${this.containerId}`)) continue;
       const txt = (item.textContent || '').trim();
-      // モデル選択肢自身（3.1 Pro 等）は絶対に「思考レベル」項目とみなさない
-      if (txt.includes('Pro') || txt.includes('Flash') || txt.includes('Argon')) continue;
+      if (!txt) continue;
+      // モデル選択肢自身は絶対に「思考レベル」項目とみなさない
+      if (modelExcludeWords.some(mw => txt.includes(mw))) continue;
 
       if (keywords.some(kw => txt.includes(kw))) {
         return item;
@@ -424,11 +644,11 @@ class ThinkingSelectorModule {
     return null;
   }
 
-  _waitForSubMenuItem(targetLevel, timeoutMs = 1000) {
+  _waitForSubMenuItem(targetLevel, timeoutMs = 1000, thinkingMenuItem = null) {
     return new Promise(resolve => {
       const startTime = Date.now();
       const interval = setInterval(() => {
-        const item = this._findTargetSubItem(targetLevel);
+        const item = this._findTargetSubItem(targetLevel, thinkingMenuItem);
         if (item) {
           clearInterval(interval);
           resolve(item);
@@ -440,61 +660,46 @@ class ThinkingSelectorModule {
     });
   }
 
-  _findTargetSubItem(targetLevel) {
-    // CDKオーバーレイペインが複数ある場合、最新（最後）のオーバーレイペインを優先探索
+  _findTargetSubItem(targetLevel, thinkingMenuItem = null) {
+    // CDKオーバーレイペインが複数ある場合、1段目メニュー以外の最新サブメニューペインを最優先探索
     const overlayPanes = Array.from(document.querySelectorAll('.cdk-overlay-pane, mat-menu-panel, [role="menu"], [role="listbox"]'));
-    const sortedContainers = overlayPanes.reverse();
+    const reversed = overlayPanes.slice().reverse();
+    let sortedContainers = reversed;
 
-    let candidateItems = [];
-    if (sortedContainers.length > 0) {
-      for (const container of sortedContainers) {
-        const items = Array.from(container.querySelectorAll(
-          '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], button.mat-mdc-menu-item, .mat-menu-item, [class*="menu-item"], button'
-        ));
-        candidateItems = candidateItems.concat(items);
-      }
-    } else {
-      candidateItems = Array.from(document.querySelectorAll(
-        '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], button.mat-mdc-menu-item, .mat-menu-item, [class*="menu-item"]'
-      ));
+    if (thinkingMenuItem) {
+      const parentMenu = thinkingMenuItem.closest('mat-menu-panel, [role="menu"], [role="listbox"]');
+      const parentPane = thinkingMenuItem.closest('.cdk-overlay-pane');
+      const subContainers = reversed.filter(c => c !== parentMenu && c !== parentPane && (!parentPane || !c.contains(thinkingMenuItem)));
+      const restContainers = reversed.filter(c => !subContainers.includes(c));
+      sortedContainers = subContainers.concat(restContainers);
     }
 
-    // モデル項目をブラックリスト化して誤爆を防止（「高度」単体は「高」の説明に含まれる場合があるため「高度な推論」に限定）
-    const modelBlacklist = [
-      'pro', 'flash', 'argon', 'ultra',
-      '高度な推論', 'すばやく回答', 'あらゆる場面', '複雑なタスク',
-      '3.5', '3.8', '3.1', '4 argon'
-    ];
+    const candidateSet = new Set();
+    if (sortedContainers.length > 0) {
+      for (const container of sortedContainers) {
+        const items = container.querySelectorAll(
+          '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], button.mat-mdc-menu-item, .mat-menu-item, [class*="menu-item"], button'
+        );
+        items.forEach(it => candidateSet.add(it));
+      }
+    } else {
+      document.querySelectorAll(
+        '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], button.mat-mdc-menu-item, .mat-menu-item, [class*="menu-item"]'
+      ).forEach(it => candidateSet.add(it));
+    }
 
-    for (const item of candidateItems) {
+    for (const item of candidateSet) {
       if (item.closest(`#${this.containerId}`)) continue;
-      const rawText = (item.textContent || '').trim();
-      if (!rawText) continue;
-      const lower = rawText.toLowerCase();
+      if (thinkingMenuItem && (item === thinkingMenuItem || item.contains(thinkingMenuItem))) {
+        continue;
+      }
+      if (item.querySelector('[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], button.mat-mdc-menu-item, .mat-menu-item')) {
+        continue;
+      }
+      if (this._isModelOrParentMenuItem(item)) continue;
 
-      // 「思考レベル」親メニュー自身は除外
-      if (rawText.includes('思考レベル') || rawText.includes('思考の深さ') || lower.includes('thinking level')) continue;
-
-      // モデル選択肢（3.1 Pro、Flash等）は除外
-      const isModelOption = modelBlacklist.some(kw => lower.includes(kw));
-      if (isModelOption) continue;
-
-      // 「思考」という単語自体の文字を除いたテキストで判定
-      const cleanedText = rawText.replace(/思考レベル|思考/g, '').trim();
-
-      // 目的のレベルに応じたマッチング
-      if (targetLevel === 'high') {
-        if (cleanedText.includes('高値') || cleanedText.includes('高') || cleanedText.includes('徹底的') || /\b(high|deep|max)\b/i.test(lower)) {
-          return item;
-        }
-      } else if (targetLevel === 'medium') {
-        if (cleanedText.includes('中') || cleanedText.includes('標準') || cleanedText.includes('バランス') || /\b(medium|balanced|standard)\b/i.test(lower)) {
-          return item;
-        }
-      } else if (targetLevel === 'low') {
-        if (cleanedText.includes('安値') || cleanedText.includes('低') || cleanedText.includes('最小') || cleanedText.includes('時間をかけず') || /\b(low|fast|min|light)\b/i.test(lower)) {
-          return item;
-        }
+      if (this._matchesSubItemLevel(item, targetLevel)) {
+        return item;
       }
     }
 
@@ -502,7 +707,7 @@ class ThinkingSelectorModule {
   }
 
   _triggerHover(el) {
-    const events = ['mouseenter', 'mouseover', 'pointerenter', 'pointerover'];
+    const events = ['mouseenter', 'mouseover', 'pointerenter', 'pointerover', 'mousemove'];
     events.forEach(type => {
       el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
     });

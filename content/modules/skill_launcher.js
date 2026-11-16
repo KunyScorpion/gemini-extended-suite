@@ -19,6 +19,24 @@ class SkillLauncherModule {
     this.hasNotifiedOnCurrentVisit = false;
     this.isAddingManual = false;
     this.boundPositionHandler = null;
+    this.mountWatcherInterval = null;
+    this.watcherIntervalMs = 300;
+    this.invalidContainerSelector = [
+      'bard-sidenav',
+      'side-nav',
+      'mat-sidenav',
+      '[data-test-id="overflow-container"]',
+      'model-response',
+      'user-query',
+      'message-content',
+      'message-actions',
+      '.conversation-turn',
+      '.cdk-overlay-container',
+      '.cdk-overlay-pane'
+    ].join(', ');
+
+    // 常駐マウント監視を即時開始（拡張UI間の連携タイミングズレを防止）
+    this.startMountWatcher(300);
   }
 
   /**
@@ -428,6 +446,59 @@ class SkillLauncherModule {
      2. ツールバーボタンのマウント＆ツリーポップアップUI
      ========================================================================== */
 
+  isInvalidButtonContext(el) {
+    if (!el) return true;
+    if (el.id === this.containerId || el.closest(`#${this.containerId}`) || el.closest(`#${this.thinkingContainerId}`)) {
+      return true;
+    }
+    const extAncestor = el.closest('[id^="g-ext-"], [class*="g-ext-"]:not(body):not(html)');
+    if (extAncestor && extAncestor !== document.body && extAncestor !== document.documentElement) {
+      return true;
+    }
+    return !!el.closest(this.invalidContainerSelector);
+  }
+
+  isInInvalidContainer(el) {
+    if (!el || !el.parentElement) return true;
+    return !!el.parentElement.closest(this.invalidContainerSelector);
+  }
+
+  /**
+   * 常駐マウントウォッチャー（初回マウント完了後は2000ms間隔に緩和）
+   */
+  startMountWatcher(intervalMs = 300) {
+    if (this.mountWatcherInterval) clearInterval(this.mountWatcherInterval);
+    this.watcherIntervalMs = intervalMs;
+
+    this.mountWatcherInterval = setInterval(() => {
+      if (!this.enabled) return;
+
+      const existing = document.getElementById(this.containerId);
+      const anchorInfo = this.findMountAnchor();
+
+      if (!existing && anchorInfo && anchorInfo.parent) {
+        this.mountUI(anchorInfo.parent, anchorInfo.beforeElement);
+        if (this.watcherIntervalMs !== 2000) {
+          this.startMountWatcher(2000);
+        }
+      } else if (existing && anchorInfo && anchorInfo.parent) {
+        if (
+          this.isInInvalidContainer(existing) ||
+          existing.parentElement !== anchorInfo.parent ||
+          existing.nextElementSibling !== anchorInfo.beforeElement
+        ) {
+          console.log('[Gemini Extended Suite] @SKILL ボタンを正しいツールバー位置へ自己修復配置します');
+          anchorInfo.parent.insertBefore(existing, anchorInfo.beforeElement);
+        }
+        if (this.watcherIntervalMs !== 2000) {
+          this.startMountWatcher(2000);
+        }
+      } else if (existing && this.isInInvalidContainer(existing)) {
+        existing.remove();
+      }
+    }, intervalMs);
+  }
+
   checkAndMount() {
     if (!this.enabled) {
       this.removeUI();
@@ -439,12 +510,21 @@ class SkillLauncherModule {
     }
 
     const anchorInfo = this.findMountAnchor();
-    if (!anchorInfo || !anchorInfo.parent) return;
-
     const existing = document.getElementById(this.containerId);
 
+    if (!anchorInfo || !anchorInfo.parent) {
+      if (existing && this.isInInvalidContainer(existing)) {
+        existing.remove();
+      }
+      return;
+    }
+
     if (existing) {
-      if (existing.parentElement !== anchorInfo.parent || existing.nextElementSibling !== anchorInfo.beforeElement) {
+      if (
+        this.isInInvalidContainer(existing) ||
+        existing.parentElement !== anchorInfo.parent ||
+        existing.nextElementSibling !== anchorInfo.beforeElement
+      ) {
         anchorInfo.parent.insertBefore(existing, anchorInfo.beforeElement);
       }
       return;
@@ -455,7 +535,11 @@ class SkillLauncherModule {
 
   findMountAnchor() {
     const thinkingRoot = document.getElementById(this.thinkingContainerId);
-    if (thinkingRoot && thinkingRoot.parentElement) {
+    if (
+      thinkingRoot &&
+      thinkingRoot.parentElement &&
+      !thinkingRoot.closest(this.invalidContainerSelector)
+    ) {
       return {
         parent: thinkingRoot.parentElement,
         beforeElement: thinkingRoot
@@ -464,18 +548,25 @@ class SkillLauncherModule {
 
     if (window.thinkingSelectorModule && typeof window.thinkingSelectorModule.findMountAnchor === 'function') {
       const fallbackAnchor = window.thinkingSelectorModule.findMountAnchor();
-      if (fallbackAnchor) return fallbackAnchor;
+      if (fallbackAnchor && fallbackAnchor.parent && !fallbackAnchor.parent.closest(this.invalidContainerSelector)) {
+        return fallbackAnchor;
+      }
     }
 
     const modelBtn = this.findModelPickerButton();
     if (!modelBtn) return null;
 
-    let toolbar = modelBtn.closest('[class*="actions"], [class*="toolbar"], [class*="trailing"], [class*="bottom"], [class*="buttons"]');
+    let toolbar = modelBtn.closest('[class*="actions"], [class*="toolbar"], [class*="trailing"], [class*="buttons"]');
+    if (toolbar && toolbar.closest(this.invalidContainerSelector)) {
+      toolbar = null;
+    }
+
     if (!toolbar) {
       let curr = modelBtn.parentElement;
       while (curr && curr !== document.body && !curr.matches('.chat-input-container, form, rich-textarea, main')) {
+        if (curr.closest(this.invalidContainerSelector)) break;
         const hasOtherAction = curr.querySelector(
-          'button[aria-label*="マイク"], button[aria-label*="音声"], button[aria-label*="送信"], [class*="send"], [class*="mic"]'
+          'button[aria-label*="マイク"], button[aria-label*="音声"], button[aria-label*="送信"], button[aria-label*="Mic"], button[aria-label*="Send"], [class*="send"], [class*="mic"]'
         );
         if (hasOtherAction && hasOtherAction !== modelBtn) {
           toolbar = curr;
@@ -498,7 +589,7 @@ class SkillLauncherModule {
       }
     }
 
-    if (modelBtn.parentElement && modelBtn.parentElement.parentElement) {
+    if (modelBtn.parentElement && modelBtn.parentElement.parentElement && !modelBtn.parentElement.parentElement.closest(this.invalidContainerSelector)) {
       return {
         parent: modelBtn.parentElement.parentElement,
         beforeElement: modelBtn.parentElement
@@ -512,16 +603,27 @@ class SkillLauncherModule {
   }
 
   findModelPickerButton() {
-    const buttons = Array.from(document.querySelectorAll('button'));
-    const keywords = ['Argon', 'Flash', 'Pro', 'Ultra', 'Gemini'];
+    if (window.thinkingSelectorModule && typeof window.thinkingSelectorModule.findModelPickerButton === 'function') {
+      return window.thinkingSelectorModule.findModelPickerButton();
+    }
 
-    for (const btn of buttons) {
-      if (btn.id === this.containerId || btn.closest(`#${this.containerId}`) || btn.closest(`#${this.thinkingContainerId}`)) {
-        continue;
-      }
+    const allButtons = Array.from(document.querySelectorAll('button')).filter(btn => {
+      if (this.isInvalidButtonContext(btn)) return false;
+      const rect = btn.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    });
+
+    const keywords = [
+      'Hydrogen', 'Carbon', 'Argon', 'Flash', 'Pro', 'Ultra', 'Nano', 'Gemini',
+      '迅速な回答', '日々の暮らし', '詳細なリサーチ', 'コードと分析', '複雑な作業'
+    ];
+
+    for (const btn of allButtons) {
       const text = (btn.textContent || '').trim();
+      if (!text || text.length >= 35) continue;
+
       const hasModelKeyword = keywords.some(kw => text.includes(kw));
-      const hasThinkingKeyword = text.includes('高値') || text.includes('安値') || text.includes('中');
+      const hasThinkingKeyword = text.includes('高値') || text.includes('安値') || text.includes('標準');
       const hasDropdown = !!btn.querySelector('svg, mat-icon, [class*="arrow"], [class*="expand"]') ||
                           btn.getAttribute('aria-haspopup') === 'menu' ||
                           btn.getAttribute('aria-expanded') !== null;
@@ -531,11 +633,13 @@ class SkillLauncherModule {
       }
     }
 
-    const attrBtn = document.querySelector(
-      'button[aria-label*="モデル"], button[aria-label*="Model"], button[data-test-id*="model"], [class*="model-picker-btn"], [class*="model-select"]'
-    );
-    if (attrBtn && !attrBtn.closest(`#${this.containerId}`) && !attrBtn.closest(`#${this.thinkingContainerId}`)) {
-      return attrBtn;
+    for (const btn of allButtons) {
+      if (
+        btn.matches('button[aria-label*="モデル"], button[aria-label*="Model"], button[data-test-id*="model"], button[class*="model-picker"], button[class*="model-select"]') ||
+        btn.closest('[class*="model-picker-btn"], [class*="model-select"], bard-mode-switcher')
+      ) {
+        return btn;
+      }
     }
 
     return null;

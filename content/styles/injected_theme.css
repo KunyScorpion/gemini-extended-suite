@@ -3,22 +3,22 @@
  * Gemini公式UIの微調整およびFull-Width表示オーバーライド
  */
 
-/* ワイド表示（Full-Width Mode）が有効化された時 */
+/* ワイド表示（Full-Width Mode）が有効化された時（サイドバー内を除外） */
 body.g-ext-full-width-enabled main,
-body.g-ext-full-width-enabled .conversation-container,
-body.g-ext-full-width-enabled [class*="conversation-container"],
-body.g-ext-full-width-enabled [class*="chat-history"],
-body.g-ext-full-width-enabled [class*="bottom-container"],
-body.g-ext-full-width-enabled [class*="input-area"] {
+body.g-ext-full-width-enabled .conversation-container:not(bard-sidenav *):not(side-nav *):not(mat-sidenav *):not([data-test-id="overflow-container"] *),
+body.g-ext-full-width-enabled [class*="conversation-container"]:not(bard-sidenav *):not(side-nav *):not(mat-sidenav *):not([data-test-id="overflow-container"] *),
+body.g-ext-full-width-enabled [class*="chat-history"]:not(bard-sidenav *):not(side-nav *):not(mat-sidenav *):not([data-test-id="overflow-container"] *),
+body.g-ext-full-width-enabled [class*="bottom-container"]:not(bard-sidenav *):not(side-nav *):not(mat-sidenav *):not([data-test-id="overflow-container"] *),
+body.g-ext-full-width-enabled [class*="input-area"]:not(bard-sidenav *):not(side-nav *):not(mat-sidenav *):not([data-test-id="overflow-container"] *) {
   max-width: 95% !important;
   width: 95% !important;
 }
 
-/* メッセージバブルの幅もワイド化 */
-body.g-ext-full-width-enabled .message-content,
-body.g-ext-full-width-enabled [class*="message-content"],
-body.g-ext-full-width-enabled [class*="model-response-text"],
-body.g-ext-full-width-enabled [class*="user-query"] {
+/* メッセージバブルの幅もワイド化（サイドバー内を除外） */
+body.g-ext-full-width-enabled .message-content:not(bard-sidenav *):not(side-nav *):not(mat-sidenav *):not([data-test-id="overflow-container"] *),
+body.g-ext-full-width-enabled [class*="message-content"]:not(bard-sidenav *):not(side-nav *):not(mat-sidenav *):not([data-test-id="overflow-container"] *),
+body.g-ext-full-width-enabled [class*="model-response-text"]:not(bard-sidenav *):not(side-nav *):not(mat-sidenav *):not([data-test-id="overflow-container"] *),
+body.g-ext-full-width-enabled [class*="user-query"]:not(bard-sidenav *):not(side-nav *):not(mat-sidenav *):not([data-test-id="overflow-container"] *) {
   max-width: 100% !important;
 }
 

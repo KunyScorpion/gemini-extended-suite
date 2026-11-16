@@ -63,3 +63,4 @@ temp/
 # AI agent and workspace local metadata
 .gemini/
 .claude/
+.antigravity/

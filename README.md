@@ -7,7 +7,7 @@
 **Gemini Web UI 向け 包括的作業支援ブラウザ拡張機能**
 
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-brightgreen.svg)](https://developer.chrome.com/docs/extensions/mv3/intro/)
-[![Version](https://img.shields.io/badge/version-1.6.0-blue.svg)](manifest.json)
+[![Version](https://img.shields.io/badge/version-1.6.1-blue.svg)](manifest.json)
 [![Target](https://img.shields.io/badge/Target-gemini.google.com-orange.svg)](https://gemini.google.com)
 [![License](https://img.shields.io/badge/license-Private-red.svg)](#)
 
@@ -130,9 +130,9 @@ flowchart TB
 - **ファイル名サニタイズ**: OS 依存の禁止文字（`\ / : * ? " < > |`）を安全に置換。
 
 ### ③ 思考レベル (Thinking Level) クイック切替 (`thinking_selector.js`)
-- **3段階思考レベルのワンクリック選択**: 思考レベルの「低（安値）」「中」「高（高値）」を、入力欄下部（モデル選択ボタンの左隣）に配置されたコンパクトなボタングループ `[ 🧠 思考: 低 | 中 | 高 ]` から瞬時に切り替え。
-- **公式メニュー自動操作**: ボタンを押すだけで、背後の公式プルダウンを自動かつ高速に選択して設定を反映。
-- **アクティブ状態の自動同期**: 公式メニューから手動変更された場合でも、現在の思考レベルを自動検知してボタンをハイライト。
+- **3段階思考レベルのワンクリック選択**: 思考レベルの「低（高速かつ効率的）」「標準（中 / バランスを取って詳しく）」「高（徹底的に詳しく）」を、入力欄下部（モデル選択ボタンの左隣）に配置されたコンパクトなボタングループ `[ 🧠 思考: 低 | 中 | 高 ]` から瞬時に切り替え。
+- **新UI・モデル名称対応**: 新モデルコードネーム（`Hydrogen` / `Carbon` / `Argon` 等）や「思考レベル」サブメニューの階層・名称変更に対応し、公式プルダウンをバックグラウンドで自動操作して設定を反映。
+- **ワイド表示対応・自己位置修復**: ワイド表示モード（`g-ext-full-width-enabled`）有効時でもサイドバー等へ誤配置せず、モデル選択ボタンの左隣へ安定マウント。手動変更時やサブメニュー表示時のチェック状態からも現在の思考レベルを自動同期。
 
 ### ④ @SKILL ランチャー（ツリーポップアップ & 自動同期） (`skill_launcher.js`)
 - **`/customize/skills` からの自動取得**: スキル管理ページを開くだけで、登録済みスキル名をDOMから正確に抽出して `chrome.storage.local` へ自動保存。更新時にはトースト通知を表示。
@@ -227,6 +227,9 @@ gemini-extended-suite/
 
 ## 7. 更新履歴 (Changelog)
 
+- **v1.6.1** (2026-11-17)
+  - **思考レベル新UI・名称変更対応 (`thinking_selector.js`)**: Gemini 公式の思考レベル新表記（「低 / 高速かつ効率的」「標準 / バランスを取って詳しく」「高 / 徹底的に詳しく」）に対応し、「高」選択時に「高速かつ効率的」へ誤爆する問題を修正。新モデル名称（`Hydrogen` / `Carbon` 等）の認識およびサブメニュー展開手順・チェック状態の同期ロジックを強化。
+  - **ワイドモード有効時のボタン非表示・誤配置・切替エラー解消 (`thinking_selector.js`, `skill_launcher.js`, `chat_enhancer.js`, `injected_theme.css`)**: `body.g-ext-full-width-enabled` クラスによりページ全体が拡張機能自身のUI内と誤判定されていた問題を修正し、ワイドモード初期読み込み時でも `@SKILL`・思考レベル切替ボタンが正常表示・動作するように改善。サイドバー内要素へのワイドCSS誤適用も除外。
 - **v1.6.0** (2026-11-10)
   - **目次（TOC）ジャンプ機能の抜本修正 (`chat_enhancer.js`)**: SPAのDOM差し替えに対応したライブDOM動的ターゲット解決、同一プロンプト重複除外バグの撤廃、高さ0要素対策のスムーズスクロールを実装。
   - **@SKILL ランチャーの刷新 (`skill_launcher.js`, `components.css`)**: `/customize/skills` からの登録済みスキル自動抽出＆保存、インデント線付きツリーポップアップメニュー、クリックによる「@スキル名＋改行」の一括入力欄挿入、手動追加・削除機能を追加。
